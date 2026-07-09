@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 
 const RELEASE_REPO_KEY = 'control-financiero-github-repo-url';
 const DEFAULT_RELEASE_REPO_URL = 'https://github.com/rubbeen/control-financiero-ruben';

@@ -1,5 +1,6 @@
-import { Cloud, Database, FolderKanban, ShieldAlert, UploadCloud } from 'lucide-react';
+import { Cloud, Database, FolderKanban, LogOut, ShieldCheck, UploadCloud } from 'lucide-react';
 import ConnectionStatus from '../components/ConnectionStatus';
+import { logout, OWNER_EMAIL } from '../services/auth';
 
 interface Props {
   setPage: (page: string) => void;
@@ -16,7 +17,7 @@ export default function Settings({ setPage }: Props) {
           <span className="rounded-lg bg-blue-50 p-2 text-primary"><Cloud className="h-5 w-5" /></span>
           <div>
             <h2 className="font-semibold text-text">Base de datos en internet</h2>
-            <p className="mt-1 text-sm text-muted">La app guarda la informacion en Firebase Firestore. Puedes usarla desde el celular con internet aunque el computador este apagado.</p>
+            <p className="mt-1 text-sm text-muted">La app guarda la informacion en Firebase Firestore y exige iniciar sesion para leer o escribir datos.</p>
           </div>
         </div>
       </section>
@@ -28,10 +29,15 @@ export default function Settings({ setPage }: Props) {
         <button onClick={() => setPage('updates')} className="flex items-center gap-3 rounded-lg bg-white p-4 text-left shadow-sm"><UploadCloud className="h-5 w-5 text-primary" /> Actualizar app</button>
       </div>
 
-      <p className="flex gap-2 rounded-lg bg-orange-50 p-3 text-sm text-purchase">
-        <ShieldAlert className="h-5 w-5 flex-none" />
-        Recomendacion: cuando confirmes que la app funciona, cambia las reglas de Firestore para proteger tus datos personales.
+      <p className="flex gap-2 rounded-lg bg-green-50 p-3 text-sm text-income">
+        <ShieldCheck className="h-5 w-5 flex-none" />
+        Acceso esperado: {OWNER_EMAIL}. Las reglas de Firestore deben permitir solo este correo.
       </p>
+
+      <button onClick={logout} className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-white p-4 font-semibold text-cocoa shadow-sm">
+        <LogOut className="h-5 w-5" />
+        Cerrar sesion
+      </button>
     </div>
   );
 }

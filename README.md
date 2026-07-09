@@ -14,6 +14,7 @@ La version actual usa Firebase Firestore para guardar la informacion en la nube.
 - Analisis mensual, comparativas y reportes.
 - IA financiera local con recomendaciones bajo demanda segun consumos diarios y mensuales.
 - Firebase Firestore como base de datos principal.
+- Login con Firebase Authentication limitado a `ribenp7@gmail.com`.
 - Actualizaciones por GitHub Releases desde la app.
 
 ## Moneda
@@ -65,9 +66,10 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 - No pide claves bancarias.
 - No conecta bancos.
 - No usa publicidad.
-- No guarda datos financieros sensibles fuera de Firebase Firestore.
-- La configuracion publica de Firebase no es una clave secreta; la seguridad real debe mantenerse con reglas de Firestore.
+- Firestore debe usar las reglas incluidas en `firestore.rules`.
+- Storage queda cerrado con `storage.rules`.
+- La configuracion publica de Firebase no es una clave secreta; la seguridad real esta en Firebase Authentication y las reglas.
 
 ## Version
 
-Version publicada: v1.1.0
+Version publicada: v1.2.0

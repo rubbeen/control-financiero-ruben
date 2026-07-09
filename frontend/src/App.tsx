@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { User } from 'firebase/auth';
 import Layout from './components/Layout';
 import AddMovement from './pages/AddMovement';
 import Advisor from './pages/Advisor';
@@ -14,10 +15,29 @@ import MovementDetail from './pages/MovementDetail';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Updates from './pages/Updates';
+import Login from './pages/Login';
+import { watchAuth } from './services/auth';
 
 export default function App() {
   const [page, setPage] = useState('dashboard');
   const [selectedMovement, setSelectedMovement] = useState<number | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    return watchAuth((nextUser) => {
+      setUser(nextUser);
+      setAuthReady(true);
+    });
+  }, []);
+
+  if (!authReady) {
+    return <main className="flex min-h-screen items-center justify-center bg-app px-6 text-center text-muted">Verificando acceso seguro...</main>;
+  }
+
+  if (!user) {
+    return <Login />;
+  }
 
   function openMovement(id: number) {
     setSelectedMovement(id);
@@ -41,5 +61,5 @@ export default function App() {
     return <Dashboard setPage={setPage} openMovement={openMovement} />;
   })();
 
-  return <Layout page={page} setPage={setPage}>{content}</Layout>;
+  return <Layout page={page} setPage={setPage} user={user}>{content}</Layout>;
 }
