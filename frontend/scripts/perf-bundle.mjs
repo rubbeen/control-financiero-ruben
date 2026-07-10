@@ -1,5 +1,5 @@
 import { createGzip } from 'node:zlib';
-import { stat, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, stat, readFile, writeFile } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
 
@@ -26,5 +26,7 @@ for (const file of files) {
   gzipBytes += Buffer.concat(chunks).length;
 }
 const report = { generatedAt: new Date().toISOString(), initialFiles: files, initialBytes: bytes, initialGzipBytes: gzipBytes, baselineMainBytes: 1746740, reductionPercent: Number(((1 - bytes / 1746740) * 100).toFixed(1)) };
-await writeFile(new URL('../../HARDENING_REPORT/PERF_BUNDLE.json', import.meta.url), JSON.stringify(report, null, 2));
+const reportDir = new URL('../../LOCAL_RELEASE_REPORT/', import.meta.url);
+await mkdir(reportDir, { recursive: true });
+await writeFile(new URL('PERF_BUNDLE.json', reportDir), JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));

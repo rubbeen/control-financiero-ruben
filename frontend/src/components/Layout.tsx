@@ -2,7 +2,6 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { ArrowLeft } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { currentUser } from '../services/auth';
 import AppLogo from './AppLogo';
 import BottomNavigation from './BottomNavigation';
 
@@ -15,7 +14,6 @@ const fallbackRoutes: Record<string, string> = {
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const user = currentUser();
   const [exitHint, setExitHint] = useState(false);
   const lastBack = useRef(0);
   const showBack = !mainRoutes.has(location.pathname);
@@ -55,11 +53,11 @@ export default function Layout() {
           <AppLogo />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[15px] font-extrabold leading-tight text-cocoa">Control Financiero Ruben</p>
-            <p className="mt-1 truncate text-xs font-medium text-muted">{user?.email} - Datos privados - COP</p>
+            <p className="mt-1 break-words text-xs font-medium text-muted">Datos protegidos - COP</p>
           </div>
         </div>
       </header>
-      <main className="safe-bottom mx-auto max-w-6xl overflow-x-hidden px-4 py-4"><Outlet /></main>
+      <main className="safe-bottom mx-auto w-full max-w-6xl min-w-0 px-4 py-4"><Outlet /></main>
       {exitHint && <p role="status" className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-cocoa px-4 py-3 text-sm font-semibold text-white shadow-lg">Presiona de nuevo para salir</p>}
       <BottomNavigation />
     </div>

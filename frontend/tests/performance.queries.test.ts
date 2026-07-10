@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc, where, writeBatch } from 'firebase/firestore';
@@ -34,7 +34,7 @@ afterAll(async () => env.cleanup());
 
 describe('consultas acotadas con 5.000 movimientos ficticios', () => {
   it('mide Dashboard e Historial sin lecturas completas', async () => {
-    const db = env.authenticatedContext(uid, { email: 'ribenp7@gmail.com', email_verified: true }).firestore();
+    const db = env.authenticatedContext(uid, { email: 'owner@example.test', email_verified: true }).firestore();
     const memoryBefore = process.memoryUsage().heapUsed;
     const start = performance.now();
     const [account, categories, budget, range, latest] = await Promise.all([
@@ -61,7 +61,9 @@ describe('consultas acotadas con 5.000 movimientos ficticios', () => {
       historyNextPage: { logicalQueries: 1, maximumDocumentsRead: 50, cursor: 'date,id' },
       mutations: { create: 'one Firestore transaction', edit: 'one Firestore transaction', delete: 'one Firestore transaction' }
     };
-    writeFileSync(resolve('..', 'HARDENING_REPORT', 'PERF_QUERIES.json'), JSON.stringify(report, null, 2));
+    const reportDir = resolve('..', 'LOCAL_RELEASE_REPORT');
+    mkdirSync(reportDir, { recursive: true });
+    writeFileSync(resolve(reportDir, 'PERF_QUERIES.json'), JSON.stringify(report, null, 2));
     expect(range.size).toBeLessThan(5000);
     expect(history.size).toBeLessThanOrEqual(50);
     expect(latest.size).toBeLessThanOrEqual(5);

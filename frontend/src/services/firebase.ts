@@ -4,13 +4,18 @@ import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 
 const useEmulator = import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true';
 
+function configValue(value: string | undefined, fallback: string) {
+  if (!value && !useEmulator) throw new Error('Falta configuracion publica de Firebase para compilar la aplicacion.');
+  return value || fallback;
+}
+
 const firebaseConfig = {
-  apiKey: 'AIzaSyACwxXIEhQKc38szsO2oPN00ndVAnTmf9E',
-  authDomain: 'control-financiero-ruben.firebaseapp.com',
-  projectId: useEmulator ? 'demo-control-financiero-ruben' : 'control-financiero-ruben',
-  storageBucket: 'control-financiero-ruben.firebasestorage.app',
-  messagingSenderId: '459907047052',
-  appId: '1:459907047052:web:2ff9cc80ea035ab9f965a9'
+  apiKey: configValue(import.meta.env.VITE_FIREBASE_API_KEY, 'demo-api-key'),
+  authDomain: configValue(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN, 'demo.local'),
+  projectId: useEmulator ? 'demo-control-financiero-ruben' : configValue(import.meta.env.VITE_FIREBASE_PROJECT_ID, 'demo-control-financiero-ruben'),
+  storageBucket: configValue(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET, 'demo.local'),
+  messagingSenderId: configValue(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID, '000000000000'),
+  appId: configValue(import.meta.env.VITE_FIREBASE_APP_ID, '1:000000000000:web:demo')
 };
 
 export const firebaseApp = initializeApp(firebaseConfig);

@@ -1,12 +1,12 @@
-# Control Financiero Ruben 1.3.1
+# Control Financiero Ruben 1.3.2
 
-Version publicada: v1.3.1
+Version de codigo: v1.3.2. La version publica permanece sin cambios hasta disponer de una firma release valida.
 
 Aplicacion financiera personal en COP construida con React, TypeScript, Firebase Auth, Cloud Firestore y Capacitor Android.
 
 ## Arquitectura
 
-El cliente consulta Firestore directamente bajo `users/{uid}`. No existe backend Python ni servidor local: el computador puede permanecer apagado. Firebase Authentication exige el correo autorizado verificado; las reglas finales agregan aislamiento por UID y validacion de documentos.
+El cliente consulta Firestore directamente bajo `users/{uid}`. No existe backend Python ni servidor local: el computador puede permanecer apagado. Firebase Authentication exige una cuenta autorizada y verificada; las reglas versionadas agregan aislamiento por UID y validacion de documentos.
 
 ## Desarrollo
 
@@ -59,7 +59,7 @@ El formato `.cfrbackup` usa AES-GCM y PBKDF2. La contrasena nunca se guarda. La 
 
 ## Migracion
 
-La v1.3.1 detecta las colecciones raiz anteriores y las copia automaticamente a `users/{uid}` antes de inicializar datos nuevos. No elimina el origen, evita duplicados si ya existen movimientos bajo UID y recalcula los saldos. La regla de transicion limita el acceso al propietario mientras se verifica la migracion.
+La aplicacion detecta las colecciones raiz anteriores y las copia automaticamente a `users/{uid}` antes de inicializar datos nuevos. No elimina el origen, evita duplicados si ya existen movimientos bajo UID y recalcula los saldos. La regla de transicion versionada exige una cuenta verificada y un claim temporal de migracion.
 
 ## Solucion de errores
 

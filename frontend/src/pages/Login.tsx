@@ -1,14 +1,14 @@
 import { FormEvent, useState } from 'react';
 import { Lock, Mail, ShieldCheck } from 'lucide-react';
 import AppLogo from '../components/AppLogo';
-import { authErrorMessage, loginWithEmail, resetOwnerPassword } from '../services/auth';
+import { authErrorMessage, consumeAuthNotice, loginWithEmail, resetPassword } from '../services/auth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => consumeAuthNotice());
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -29,8 +29,8 @@ export default function Login() {
     setError('');
     setMessage('');
     try {
-      await resetOwnerPassword();
-      setMessage('Enviamos un enlace al correo autorizado.');
+      await resetPassword(email);
+      setMessage('Si la cuenta est\u00e1 registrada y autorizada, recibir\u00e1s las instrucciones correspondientes.');
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -52,7 +52,7 @@ export default function Login() {
         <form onSubmit={submit} className="space-y-4 rounded-lg border border-orange-100 bg-white p-5 shadow-sm">
           <div className="flex items-start gap-3 rounded-lg bg-green-50 p-3 text-sm text-income">
             <ShieldCheck className="mt-0.5 h-5 w-5 flex-none" />
-            <p>Tu informacion financiera queda protegida. Solo este correo autorizado puede leer o escribir datos.</p>
+            <p>{'Tu informaci\u00f3n financiera est\u00e1 protegida mediante autenticaci\u00f3n y reglas de acceso.'}</p>
           </div>
 
           {error && <p className="rounded-lg bg-red-50 p-3 text-sm font-medium text-expense">{error}</p>}
@@ -78,7 +78,7 @@ export default function Login() {
             {loading ? 'Verificando...' : 'Entrar seguro'}
           </button>
 
-          <button type="button" onClick={recoverPassword} disabled={loading} className="w-full rounded-lg border border-border px-4 py-3 text-sm font-semibold text-cocoa disabled:opacity-60">
+          <button type="button" onClick={recoverPassword} disabled={loading || !email.trim()} className="w-full rounded-lg border border-border px-4 py-3 text-sm font-semibold text-cocoa disabled:opacity-60">
             Recuperar contrasena
           </button>
         </form>
