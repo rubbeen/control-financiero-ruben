@@ -4,7 +4,7 @@ import { auth } from './firebase';
 import { clearInitializationState } from './firestoreHelpers';
 import { queryClient } from './queryClient';
 
-export const OWNER_EMAIL = 'ribenp7@gmail.com';
+let pendingAuthNotice = '';
 
 const friendlyErrors: Record<string, string> = {
   'auth/invalid-credential': 'El correo o la contrasena no coinciden.',
@@ -28,7 +28,6 @@ export function currentUser() {
 
 export async function loginWithEmail(email: string, password: string) {
   const normalized = email.trim().toLowerCase();
-  if (normalized !== OWNER_EMAIL) throw new Error('Esta cuenta no esta autorizada.');
   try {
     const credential = await signInWithEmailAndPassword(auth, normalized, password);
     if (!credential.user.emailVerified) {
@@ -41,12 +40,29 @@ export async function loginWithEmail(email: string, password: string) {
   }
 }
 
-export async function resetOwnerPassword() {
+export async function resetPassword(email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) throw new Error('Ingresa el correo de la cuenta.');
   try {
-    await sendPasswordResetEmail(auth, OWNER_EMAIL);
+    await sendPasswordResetEmail(auth, normalized);
   } catch (error) {
-    throw Object.assign(new Error(authErrorMessage(error)), { cause: error });
+    if (error instanceof FirebaseError && error.code === 'auth/network-request-failed') {
+      throw Object.assign(new Error(authErrorMessage(error)), { cause: error });
+    }
   }
+}
+
+export function consumeAuthNotice() {
+  const notice = pendingAuthNotice;
+  pendingAuthNotice = '';
+  return notice;
+}
+
+export async function handleFirestoreAccessError(error: unknown) {
+  if (!(error instanceof FirebaseError) || error.code !== 'permission-denied') return false;
+  pendingAuthNotice = 'No fue posible acceder a la informacion con esta cuenta.';
+  await logout();
+  return true;
 }
 
 export async function logout() {

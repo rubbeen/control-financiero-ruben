@@ -1,4 +1,10 @@
 import { expect, Page, test } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { testCredentials } from './auth-fixture';
+
+const screenshotsDir = resolve('..', 'LOCAL_RELEASE_REPORT', 'legacy-responsive');
+mkdirSync(screenshotsDir, { recursive: true });
 
 const viewports = [{ width: 360, height: 800 }, { width: 390, height: 844 }, { width: 412, height: 915 }, { width: 768, height: 1024 }, { width: 1366, height: 768 }];
 const routes = [
@@ -8,10 +14,11 @@ const routes = [
 
 async function login(page: Page) {
   await page.goto('/');
-  await page.getByLabel('Correo').fill('ribenp7@gmail.com');
-  await page.getByLabel('Contrasena').fill('Prueba-segura-123');
+  const credentials = testCredentials();
+  await page.getByLabel('Correo').fill(credentials.email);
+  await page.getByLabel('Contrasena').fill(credentials.password);
   await page.getByRole('button', { name: 'Entrar seguro' }).click();
-  await expect(page.getByText('Hola, Ruben')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Hola' })).toBeVisible({ timeout: 30_000 });
 }
 
 for (const viewport of viewports) {
@@ -19,14 +26,14 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto('/');
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.screenshot({ path: `../HARDENING_REPORT/screenshots/login-${viewport.width}.png`, fullPage: true });
+    await page.screenshot({ path: resolve(screenshotsDir, `login-${viewport.width}.png`), fullPage: true });
     await login(page);
     for (const [name, route] of routes) {
       await page.goto(route);
       await expect(page.locator('main')).toBeVisible();
       await page.waitForTimeout(250);
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), { message: `${name} tiene overflow` }).toBe(true);
-      await page.screenshot({ path: `../HARDENING_REPORT/screenshots/${name}-${viewport.width}.png`, fullPage: true });
+      await page.screenshot({ path: resolve(screenshotsDir, `${name}-${viewport.width}.png`), fullPage: true });
     }
     const nav = page.locator('nav[aria-label="Navegacion principal"] a');
     await expect(nav).toHaveCount(5);

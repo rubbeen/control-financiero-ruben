@@ -10,7 +10,7 @@ const packageJson = JSON.parse(await readFile(path.join(frontend, 'package.json'
 const gradle = await readFile(path.join(frontend, 'android', 'app', 'build.gradle'), 'utf8');
 const versionName = gradle.match(/versionName\s+"([^"]+)"/)?.[1];
 const versionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1]);
-if (packageJson.version !== versionName || versionName !== '1.3.1' || versionCode !== 131) throw new Error('Las versiones no coinciden. Ejecuta npm run version:check.');
+if (packageJson.version !== versionName || versionName !== '1.3.2' || versionCode !== 132) throw new Error('Las versiones no coinciden. Ejecuta npm run version:check.');
 const apk = path.join(frontend, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 const bytes = await readFile(apk).catch(() => { throw new Error('No existe APK release. Configura la firma externa y ejecuta assembleRelease.'); });
 const signingFile = path.join(frontend, 'android', 'keystore.properties');

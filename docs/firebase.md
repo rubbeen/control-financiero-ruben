@@ -1,4 +1,4 @@
-# Firebase Firestore v1.3.0
+# Firebase Firestore
 
 Proyecto esperado: `control-financiero-ruben`, plan Spark. Los datos nuevos viven en:
 
@@ -9,6 +9,6 @@ Proyecto esperado: `control-financiero-ruben`, plan Spark. Los datos nuevos vive
 - `users/{uid}/meta/counters`
 - `users/{uid}/meta/initialization`
 
-Las reglas finales exigen autenticacion, UID coincidente, `ribenp7@gmail.com` y correo verificado. Tambien validan campos y bloquean colecciones raiz. Storage permanece totalmente cerrado.
+Las reglas versionadas exigen autenticacion, UID coincidente y correo verificado. Tambien validan campos y bloquean colecciones raiz. Storage permanece totalmente cerrado.
 
 No publiques reglas finales antes de completar `MIGRATION_RUNBOOK.md`, porque el cliente anterior y los datos raiz dejarian de funcionar.

@@ -6,7 +6,7 @@ import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
 const PROJECT_ID = 'demo-control-financiero-ruben';
-const OWNER_EMAIL = 'ribenp7@gmail.com';
+const OWNER_EMAIL = 'owner@example.test';
 const OWNER_UID = 'owner-test-uid';
 let env: RulesTestEnvironment;
 
@@ -53,16 +53,17 @@ describe('aislamiento por UID', () => {
     await assertFails(getDoc(doc(ownerDb('other-uid'), `users/${OWNER_UID}/movements/1`)));
   });
 
-  it('bloquea otro correo', async () => {
-    await assertFails(getDoc(doc(ownerDb(OWNER_UID, 'otra@example.com'), `users/${OWNER_UID}/movements/1`)));
-  });
-
   it('bloquea correo sin verificar', async () => {
     await assertFails(getDoc(doc(ownerDb(OWNER_UID, OWNER_EMAIL, false), `users/${OWNER_UID}/movements/1`)));
   });
 
   it('permite al propietario ver su ruta', async () => {
     await assertSucceeds(getDoc(doc(ownerDb(), `users/${OWNER_UID}/movements/1`)));
+  });
+
+  it('mantiene aislada la ruta propia de otra cuenta verificada', async () => {
+    await assertSucceeds(getDoc(doc(ownerDb('other-uid', 'other@example.test'), 'users/other-uid/movements/1')));
+    await assertFails(getDoc(doc(ownerDb('other-uid', 'other@example.test'), `users/${OWNER_UID}/movements/1`)));
   });
 
   it('bloquea colecciones raiz heredadas', async () => {

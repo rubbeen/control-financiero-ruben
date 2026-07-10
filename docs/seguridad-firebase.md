@@ -1,7 +1,7 @@
 # Seguridad Firebase
 
 1. Mantener Email/Password sin registro publico.
-2. Verificar `ribenp7@gmail.com` y obtener su UID.
+2. Verificar la cuenta propietaria autorizada y obtener su UID fuera del repositorio.
 3. Crear respaldo verificado.
 4. Probar `firestore.rules.transition`, `firestore.rules` e indices en Emulator.
 5. Publicar manualmente reglas de transicion.

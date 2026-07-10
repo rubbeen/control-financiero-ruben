@@ -1,18 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthorized() {
-      return request.auth != null
-        && request.auth.token.email == 'ribenp7@gmail.com'
-        && request.auth.token.email_verified == true;
+    function isVerifiedUser() {
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
     match /users/{userId}/{document=**} {
-      allow read, write: if isAuthorized() && request.auth.uid == userId;
+      allow read, write: if isVerifiedUser() && request.auth.uid == userId;
     }
 
     match /{legacyCollection}/{documentId} {
-      allow read, write: if isAuthorized()
+      allow read, write: if isVerifiedUser()
+        && request.auth.token.migration_owner == true
         && legacyCollection in ['accounts', 'categories', 'movements', 'budgets'];
     }
 
