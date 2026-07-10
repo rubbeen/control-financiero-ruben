@@ -1,11 +1,11 @@
-# Arquitectura
+# Arquitectura v1.3.0
 
-Control Financiero Rubén usa una arquitectura local:
+- UI: React, Vite, TypeScript, Tailwind y rutas hash.
+- Estado remoto: TanStack React Query, cache exclusivamente en memoria.
+- Identidad: Firebase Authentication Email/Password con correo verificado.
+- Datos: `users/{uid}/{accounts|categories|movements|budgets}` en Firestore.
+- Contadores e inicializacion: `users/{uid}/meta/*` mediante transacciones.
+- Analitica: carga un rango y ejecuta calculos puros sin consultas internas.
+- Android: Capacitor, HTTPS, backup desactivado y release con firma externa.
 
-- Frontend: React, Vite, TypeScript, Tailwind CSS, Recharts y Lucide React.
-- Backend: Python, FastAPI, SQLModel y SQLite.
-- Android: Capacitor.
-- Datos: `data/finance.db`.
-- Exportaciones: `exports`.
-
-El celular se conecta al computador por WiFi local usando la URL configurable del backend. No se usa nube ni conexion bancaria.
+FastAPI, SQLite, puerto 8000, IP local y Python fueron retirados al confirmar que el frontend no los importaba.

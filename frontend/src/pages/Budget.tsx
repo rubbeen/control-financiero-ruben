@@ -1,75 +1,44 @@
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Save } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
+import AccountSelector from '../components/AccountSelector';
 import BudgetProgressBar from '../components/BudgetProgressBar';
-import { analyticsService } from '../services/analytics';
+import UnsavedChangesGuard from '../components/UnsavedChangesGuard';
+import { useAccount } from '../context/AccountContext';
+import { useCategories, useFinancialAnalysis, useUid } from '../hooks/useFinanceQueries';
 import { budgetsService } from '../services/budgets';
-import { Budget as BudgetType, CategoryBudget, MonthlySummary } from '../types/finance';
+import { queryClient, queryKeys } from '../services/queryClient';
+import { Budget as BudgetType } from '../types/finance';
 import { formatCurrency } from '../utils/currency';
 import { currentYearMonth } from '../utils/dates';
-import AccountSelector from '../components/AccountSelector';
+
+const blankBudget = (year: number, month: number): Partial<BudgetType> => ({ year, month, total_budget: 0, saving_goal: 0, unnecessary_expense_limit: 0, category_budgets: [] });
 
 export default function Budget() {
-  const { year, month } = currentYearMonth();
-  const [budget, setBudget] = useState<Partial<BudgetType>>({ year, month, total_budget: 0, saving_goal: 0, unnecessary_expense_limit: 0, category_budgets: [] });
-  const [summary, setSummary] = useState<MonthlySummary | null>(null);
+  const current = currentYearMonth();
+  const uid = useUid();
+  const { activeAccountId } = useAccount();
+  const categories = useCategories(false);
+  const analysis = useFinancialAnalysis(current.year, current.month, 2);
+  const budgetQuery = useQuery({ queryKey: queryKeys.budget(uid, activeAccountId, current.year, current.month), queryFn: () => budgetsService.get(activeAccountId, current.year, current.month, uid), staleTime: 30_000 });
+  const [budget, setBudget] = useState<Partial<BudgetType>>(blankBudget(current.year, current.month));
+  const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState('');
-
-  useEffect(() => {
-    budgetsService.get(year, month).then(setBudget).catch(() => undefined);
-    analyticsService.summary(year, month).then(setSummary).catch(() => undefined);
-  }, [year, month]);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    const payload = {
-      ...budget,
-      year: Number(budget.year || year),
-      month: Number(budget.month || month),
-      total_budget: Number(budget.total_budget || 0),
-      saving_goal: Number(budget.saving_goal || 0),
-      unnecessary_expense_limit: Number(budget.unnecessary_expense_limit || 0),
-      category_budgets: (budget.category_budgets || []).map((item: CategoryBudget) => ({ category_id: item.category_id, amount_limit: Number(item.amount_limit || 0) }))
-    };
-    const saved = budget.id ? await budgetsService.update(budget.id, payload as BudgetType) : await budgetsService.create(payload as BudgetType);
-    setBudget(saved);
-    setMessage('Presupuesto guardado correctamente.');
-  }
-
+  useEffect(() => { if (!dirty) setBudget(budgetQuery.data || blankBudget(current.year, current.month)); }, [budgetQuery.data, activeAccountId, current.year, current.month, dirty]);
+  const save = useMutation({ mutationFn: () => budgetsService.save(activeAccountId, budget, uid), onSuccess: async (saved) => { setBudget(saved); setDirty(false); setMessage('Presupuesto guardado.'); await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.budget(uid, activeAccountId, current.year, current.month) }), queryClient.invalidateQueries({ queryKey: ['financialAnalysis', uid, activeAccountId] })]); } });
+  const update = (change: Partial<BudgetType>) => { setBudget((value) => ({ ...value, ...change })); setDirty(true); setMessage(''); };
+  const setCategoryLimit = (categoryId: number, amount: number) => {
+    const rows = [...(budget.category_budgets || [])];
+    const index = rows.findIndex((item) => item.category_id === categoryId);
+    if (amount > 0 && index >= 0) rows[index] = { category_id: categoryId, amount_limit: amount };
+    else if (amount > 0) rows.push({ category_id: categoryId, amount_limit: amount });
+    else if (index >= 0) rows.splice(index, 1);
+    update({ category_budgets: rows.slice(0, 10) });
+  };
+  const submit = (event: FormEvent) => { event.preventDefault(); void save.mutateAsync(); };
+  const summary = analysis.data?.summary;
   const spent = summary?.total_expense || 0;
   const limit = Number(budget.total_budget || 0);
-
-  return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-text">Presupuesto mensual</h1>
-      <AccountSelector />
-      <BudgetProgressBar used={spent} limit={limit} />
-      <section className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-lg bg-white p-4 shadow-sm"><p className="text-sm text-muted">Total gastado</p><p className="text-xl font-bold">{formatCurrency(spent)}</p></div>
-        <div className="rounded-lg bg-white p-4 shadow-sm"><p className="text-sm text-muted">Disponible</p><p className="text-xl font-bold">{formatCurrency(limit - spent)}</p></div>
-        <div className="rounded-lg bg-white p-4 shadow-sm"><p className="text-sm text-muted">Meta ahorro</p><p className="text-xl font-bold">{formatCurrency(Number(budget.saving_goal || 0))}</p></div>
-      </section>
-      <form onSubmit={submit} className="space-y-4 rounded-lg border border-border bg-white p-4 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm font-semibold">Ano
-            <input type="number" className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={budget.year || year} onChange={(e) => setBudget({ ...budget, year: Number(e.target.value) })} />
-          </label>
-          <label className="text-sm font-semibold">Mes
-            <input type="number" min="1" max="12" className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={budget.month || month} onChange={(e) => setBudget({ ...budget, month: Number(e.target.value) })} />
-          </label>
-        </div>
-        <label className="block text-sm font-semibold">Presupuesto total
-          <input type="number" min="0" className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={budget.total_budget || ''} onChange={(e) => setBudget({ ...budget, total_budget: Number(e.target.value) })} />
-        </label>
-        <label className="block text-sm font-semibold">Meta de ahorro
-          <input type="number" min="0" className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={budget.saving_goal || ''} onChange={(e) => setBudget({ ...budget, saving_goal: Number(e.target.value) })} />
-        </label>
-        <label className="block text-sm font-semibold">Limite de gastos no necesarios
-          <input type="number" min="0" className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={budget.unnecessary_expense_limit || ''} onChange={(e) => setBudget({ ...budget, unnecessary_expense_limit: Number(e.target.value) })} />
-        </label>
-        {message && <p className="rounded-lg bg-green-50 p-3 text-sm text-income">{message}</p>}
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-4 font-semibold text-white"><Save className="h-5 w-5" /> Guardar presupuesto</button>
-      </form>
-      {summary?.category_expenses?.some((item) => item.amount > limit * 0.3) && <p className="rounded-lg bg-orange-50 p-3 text-sm text-purchase">Hay categorias cerca del limite mensual. Revisa los gastos por categoria en Analisis.</p>}
-    </div>
-  );
+  const available = Math.max(0, limit - spent);
+  return <div className="space-y-4"><UnsavedChangesGuard dirty={dirty} /><h1 className="text-2xl font-bold">Presupuesto mensual</h1><AccountSelector /><BudgetProgressBar used={spent} limit={limit} /><section className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg bg-white p-4"><p className="text-sm text-muted">Total gastado</p><p className="text-xl font-bold">{formatCurrency(spent)}</p></div><div className="rounded-lg bg-white p-4"><p className="text-sm text-muted">Disponible</p><p className="text-xl font-bold">{formatCurrency(available)}</p></div><div className="rounded-lg bg-white p-4"><p className="text-sm text-muted">Meta ahorro</p><p className="text-xl font-bold">{formatCurrency(Number(budget.saving_goal || 0))}</p></div></section>{limit > 0 && spent / limit >= 1 ? <p className="rounded-lg bg-red-50 p-3 font-semibold text-expense">Limite alcanzado: revisa los gastos antes de continuar.</p> : limit > 0 && spent / limit >= 0.8 ? <p className="rounded-lg bg-orange-50 p-3 font-semibold text-purchase">Alerta: ya usaste al menos el 80% del presupuesto.</p> : null}<form onSubmit={submit} className="space-y-4 rounded-lg border bg-white p-4"><label className="block text-sm font-semibold">Presupuesto total<input type="number" min="0" step="1" className="mt-1 w-full rounded-lg border px-3 py-3" value={budget.total_budget || ''} onChange={(event) => update({ total_budget: Number(event.target.value) })} /></label><label className="block text-sm font-semibold">Meta de ahorro<input type="number" min="0" step="1" className="mt-1 w-full rounded-lg border px-3 py-3" value={budget.saving_goal || ''} onChange={(event) => update({ saving_goal: Number(event.target.value) })} /></label><label className="block text-sm font-semibold">Limite de gastos no necesarios<input type="number" min="0" step="1" className="mt-1 w-full rounded-lg border px-3 py-3" value={budget.unnecessary_expense_limit || ''} onChange={(event) => update({ unnecessary_expense_limit: Number(event.target.value) })} /></label><fieldset className="space-y-2"><legend className="font-bold">Limites por categoria</legend>{(categories.data || []).filter((category) => category.type !== 'income').slice(0, 10).map((category) => { const categoryLimit = budget.category_budgets?.find((item) => item.category_id === category.id)?.amount_limit || 0; const categorySpent = summary?.category_expenses.find((item) => item.category_id === category.id)?.amount || 0; const percentage = categoryLimit ? Math.min(100, (categorySpent / categoryLimit) * 100) : 0; return <label key={category.id} className="block rounded-lg border p-3"><span className="flex min-w-0 justify-between gap-3 text-sm"><strong className="min-w-0 truncate">{category.name}</strong><span className="flex-none">{formatCurrency(categorySpent)} · {percentage.toFixed(0)}%</span></span><input aria-label={`Limite ${category.name}`} type="number" min="0" step="1" className="mt-2 w-full rounded-lg border px-3 py-2" value={categoryLimit || ''} placeholder="Sin limite" onChange={(event) => setCategoryLimit(category.id, Number(event.target.value))} /></label>; })}</fieldset>{message && <p className="rounded-lg bg-green-50 p-3 text-income">{message}</p>}{save.error && <p className="rounded-lg bg-red-50 p-3 text-expense">{save.error.message}</p>}<button disabled={save.isPending} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-white"><Save className="h-5 w-5" /> {save.isPending ? 'Guardando...' : 'Guardar presupuesto'}</button></form></div>;
 }

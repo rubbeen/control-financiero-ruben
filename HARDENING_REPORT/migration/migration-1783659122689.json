@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-07-10T04:52:02.689Z",
+  "mode": "dry-run",
+  "target": "emulator:127.0.0.1:8080",
+  "uid": "owner-test-uid",
+  "rootsDeleted": false,
+  "collections": {
+    "accounts": {
+      "source": 0,
+      "copied": 0,
+      "needsReview": 0
+    },
+    "categories": {
+      "source": 0,
+      "copied": 0,
+      "needsReview": 0
+    },
+    "movements": {
+      "source": 0,
+      "copied": 0,
+      "needsReview": 0
+    },
+    "budgets": {
+      "source": 0,
+      "copied": 0,
+      "needsReview": 0
+    }
+  },
+  "warnings": []
+}

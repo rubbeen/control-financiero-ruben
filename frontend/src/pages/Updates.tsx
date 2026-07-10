@@ -1,84 +1,18 @@
-import { Download, Github, RefreshCcw, UploadCloud } from 'lucide-react';
-import { FormEvent, useState } from 'react';
-import { APP_VERSION, getLatestRelease, getReleaseRepoUrl, setReleaseRepoUrl } from '../services/version';
+import { Download, ExternalLink, RefreshCcw, UploadCloud, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { APP_VERSION, APP_VERSION_CODE, downloadAndInstall, getReleaseFallback, getUpdateManifest, UpdateManifest } from '../services/version';
 
 export default function Updates() {
-  const [repoUrl, setRepoUrlState] = useState(getReleaseRepoUrl());
-  const [latest, setLatest] = useState<any>(null);
+  const [manifest, setManifest] = useState<UpdateManifest | null>(null);
+  const [fallback, setFallback] = useState<{ releasePageUrl: string; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [confirm, setConfirm] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-
-  function saveRepo(event: FormEvent) {
-    event.preventDefault();
-    setReleaseRepoUrl(repoUrl);
-    setMessage('Repositorio guardado. Ahora puedes consultar actualizaciones.');
-  }
-
-  async function check() {
-    setLoading(true);
-    setError('');
-    setMessage('');
-    try {
-      const release = await getLatestRelease(repoUrl);
-      setLatest(release);
-      setMessage(release.version === APP_VERSION ? 'Ya tienes la version actual.' : `Hay una version disponible: ${release.version}.`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pude revisar actualizaciones.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function download() {
-    if (!latest?.apkUrl) return;
-    window.open(latest.apkUrl, '_blank');
-  }
-
-  return (
-    <div className="space-y-4">
-      <section className="rounded-lg bg-gradient-to-br from-cocoa via-copper to-purchase p-5 text-white shadow-soft">
-        <div className="flex items-start gap-3">
-          <span className="rounded-2xl bg-white/15 p-3">
-            <UploadCloud className="h-7 w-7 text-amber-100" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold text-amber-100">GitHub Releases</p>
-            <h1 className="mt-1 text-2xl font-extrabold">Actualizar app</h1>
-            <p className="mt-2 text-sm text-amber-50">Version instalada: {APP_VERSION}. Puedes revisar si hay un APK nuevo publicado en GitHub.</p>
-          </div>
-        </div>
-      </section>
-
-      <form onSubmit={saveRepo} className="space-y-3 rounded-lg border border-border bg-white p-4 shadow-sm">
-        <label className="block text-sm font-semibold text-text">Repositorio de GitHub
-          <input className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={repoUrl} onChange={(event) => setRepoUrlState(event.target.value)} placeholder="https://github.com/usuario/control-financiero-ruben" />
-        </label>
-        <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-white">
-          <Github className="h-4 w-4" /> Guardar repositorio
-        </button>
-      </form>
-
-      <button onClick={check} disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-lg bg-cocoa px-4 py-4 font-semibold text-white disabled:opacity-60">
-        <RefreshCcw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} /> Revisar ultima version
-      </button>
-
-      {message && <p className="rounded-lg bg-green-50 p-3 text-sm text-income">{message}</p>}
-      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-expense">{error}</p>}
-
-      {latest && (
-        <section className="space-y-3 rounded-lg border border-border bg-white p-4 shadow-sm">
-          <div>
-            <p className="text-sm text-muted">Ultima version</p>
-            <h2 className="text-xl font-bold text-text">{latest.name || latest.version}</h2>
-          </div>
-          <p className="max-h-40 overflow-auto whitespace-pre-wrap text-sm text-muted">{latest.notes || 'Sin notas de version.'}</p>
-          <button onClick={download} className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-white">
-            <Download className="h-5 w-5" /> Descargar APK
-          </button>
-          <p className="text-xs text-muted">Android pedira confirmar la instalacion. Por seguridad, ninguna app externa a Play Store puede reemplazarse sola sin tu permiso.</p>
-        </section>
-      )}
-    </div>
-  );
+  const controller = useRef<AbortController | null>(null);
+  const check = async () => { setLoading(true); setError(''); setFallback(null); try { const next = await getUpdateManifest(); setManifest(next); setMessage(next.versionCode > APP_VERSION_CODE ? `Nueva version disponible: ${next.versionName}.` : 'Ya tienes la version mas reciente.'); } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo revisar.'); setFallback(await getReleaseFallback()); } finally { setLoading(false); } };
+  const install = async () => { if (!manifest) return; setConfirm(false); setLoading(true); setProgress(0); setError(''); controller.current = new AbortController(); try { await downloadAndInstall(manifest, setProgress, controller.current.signal); setMessage('APK verificado. Confirma la instalacion en la pantalla de Android.'); } catch (cause) { if ((cause as Error).name !== 'AbortError') setError(cause instanceof Error ? cause.message : 'No se pudo actualizar.'); } finally { setLoading(false); controller.current = null; } };
+  return <div className="space-y-4"><ConfirmDialog open={confirm} title="Descargar actualizacion" message={`Se descargara y verificara la version ${manifest?.versionName}. Android te pedira confirmar la instalacion.`} confirmLabel="Continuar" onCancel={() => setConfirm(false)} onConfirm={() => void install()} /><section className="rounded-lg bg-cocoa p-5 text-white"><UploadCloud className="h-7 w-7" /><h1 className="mt-2 text-2xl font-extrabold">Actualizar app</h1><p className="mt-2 text-sm text-amber-50">Version instalada: {APP_VERSION} ({APP_VERSION_CODE}). Fuente fija: repositorio oficial.</p></section><button onClick={() => void check()} disabled={loading} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-white disabled:opacity-60"><RefreshCcw className={`h-5 w-5 ${loading && !progress ? 'animate-spin' : ''}`} /> Revisar actualizaciones</button>{manifest && <section className="space-y-3 rounded-lg border bg-white p-4"><h2 className="text-xl font-bold">Version {manifest.versionName}</h2><p className="text-sm text-muted">{(manifest.fileSizeBytes / 1024 / 1024).toFixed(1)} MB · {new Date(manifest.publishedAt).toLocaleDateString('es-CO')}</p><ul className="list-inside list-disc text-sm">{manifest.releaseNotes.map((note) => <li key={note}>{note}</li>)}</ul>{manifest.versionCode > APP_VERSION_CODE && <button onClick={() => setConfirm(true)} disabled={loading} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-white"><Download className="h-5 w-5" /> Actualizar app</button>}</section>}{loading && progress > 0 && <section className="rounded-lg bg-blue-50 p-3"><div className="flex justify-between"><span>Descargando y verificando</span><strong>{progress}%</strong></div><progress className="mt-2 w-full" value={progress} max="100" /><button onClick={() => controller.current?.abort()} className="mt-2 flex min-h-11 items-center gap-2 text-expense"><X className="h-4 w-4" /> Cancelar</button></section>}{message && <p className="rounded-lg bg-green-50 p-3 text-income">{message}</p>}{error && <p className="rounded-lg bg-red-50 p-3 text-expense">{error}</p>}{fallback && <a href={fallback.releasePageUrl} target="_blank" rel="noreferrer" className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-primary bg-white px-4 font-semibold text-primary"><ExternalLink className="h-4 w-4" /> {fallback.message}</a>}</div>;
 }

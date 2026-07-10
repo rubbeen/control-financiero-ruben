@@ -1,117 +1,69 @@
+import { useMutation } from '@tanstack/react-query';
 import { Save } from 'lucide-react';
-import { FormEvent, useEffect, useState } from 'react';
-import { categoriesService } from '../services/categories';
-import { movementsService } from '../services/movements';
-import { Category, MovementInput, MovementType } from '../types/finance';
-import { todayISO } from '../utils/dates';
+import { FormEvent, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import AccountSelector from '../components/AccountSelector';
+import UnsavedChangesGuard from '../components/UnsavedChangesGuard';
+import { useAccount } from '../context/AccountContext';
+import { useCategories, useUid } from '../hooks/useFinanceQueries';
+import { movementsService } from '../services/movements';
+import { queryClient } from '../services/queryClient';
+import { MovementInput, MovementType } from '../types/finance';
+import { todayISO } from '../utils/dates';
 
-interface Props {
-  setPage: (page: string) => void;
-}
+const makeInitial = (type: MovementType): MovementInput => ({ type, amount: 0, date: todayISO(), category_id: 0, description: '', payment_method: 'Efectivo', notes: '', tag: '', place: '', is_necessary: true, is_recurring: false, adjustment_direction: type === 'adjustment' ? 'in' : undefined });
 
-const initial: MovementInput = {
-  type: 'expense',
-  amount: 0,
-  date: todayISO(),
-  category_id: 0,
-  description: '',
-  payment_method: 'Efectivo',
-  notes: '',
-  tag: '',
-  place: '',
-  is_necessary: true,
-  is_recurring: false
-};
-
-export default function AddMovement({ setPage }: Props) {
-  const [form, setForm] = useState<MovementInput>(initial);
-  const [categories, setCategories] = useState<Category[]>([]);
+export default function AddMovement() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const initialType = (['income', 'expense'].includes(params.get('tipo') || '') ? params.get('tipo') : 'expense') as MovementType;
+  const [form, setForm] = useState<MovementInput>(makeInitial(initialType));
+  const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const uid = useUid();
+  const { accounts, activeAccountId } = useAccount();
+  const categories = useCategories(false);
+  const available = useMemo(() => (categories.data || []).filter((category) => form.type === 'income' ? category.type !== 'expense' : form.type === 'transfer' ? true : category.type !== 'income'), [categories.data, form.type]);
 
-  useEffect(() => {
-    categoriesService.list().then(setCategories).catch((err) => setError(err.message));
-  }, []);
+  const selectedCategoryId = available.some((category) => category.id === form.category_id) ? form.category_id : (available[0]?.id || 0);
 
-  const available = categories.filter((cat) => {
-    if (form.type === 'income') return cat.type === 'income' || cat.type === 'both';
-    if (form.type === 'transfer') return true;
-    return cat.type === 'expense' || cat.type === 'both';
+  const save = useMutation({
+    mutationFn: (input: MovementInput) => movementsService.create({ ...input, account_id: activeAccountId, source_account_id: input.type === 'transfer' ? activeAccountId : undefined }, uid),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['financialAnalysis', uid, activeAccountId] }),
+        queryClient.invalidateQueries({ queryKey: ['latestMovements', uid, activeAccountId] }),
+        queryClient.invalidateQueries({ queryKey: ['movements', uid, activeAccountId] }),
+        queryClient.invalidateQueries({ queryKey: ['accounts', uid] })
+      ]);
+    }
   });
 
-  useEffect(() => {
-    if (!available.some((cat) => cat.id === form.category_id)) {
-      setForm((prev) => ({ ...prev, category_id: available[0]?.id || 0 }));
-    }
-  }, [available.length, form.type]);
+  function update(change: Partial<MovementInput>) {
+    setDirty(true);
+    setForm((current) => ({ ...current, ...change }));
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setError('');
     setMessage('');
-    try {
-      await movementsService.create({ ...form, amount: Number(form.amount), category_id: Number(form.category_id) });
-      setMessage('Movimiento guardado correctamente.');
-      setForm({ ...initial, date: todayISO(), category_id: available[0]?.id || 0 });
-      window.setTimeout(() => setPage('dashboard'), 700);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el movimiento.');
-    }
+    await save.mutateAsync({ ...form, amount: Math.round(Number(form.amount)), category_id: Number(selectedCategoryId) });
+    setDirty(false);
+    setMessage(form.type === 'transfer' ? 'Transferencia guardada en ambas cuentas.' : 'Movimiento guardado correctamente.');
+    window.setTimeout(() => navigate('/'), 500);
   }
 
-  return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="text-2xl font-bold text-text">Agregar movimiento</h1>
-      <p className="mt-1 text-sm text-muted">Formulario rapido para registrar ingresos, gastos y compras.</p>
-      <div className="mt-4">
-        <AccountSelector setPage={setPage} />
-      </div>
-      <form onSubmit={submit} className="mt-4 space-y-4 rounded-lg border border-border bg-white p-4 shadow-sm">
-        <label className="block text-sm font-semibold text-text">Tipo
-          <select className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as MovementType })}>
-            <option value="expense">Gasto</option>
-            <option value="income">Ingreso</option>
-            <option value="purchase">Compra</option>
-            <option value="transfer">Transferencia</option>
-            <option value="adjustment">Ajuste</option>
-          </select>
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-semibold text-text">Valor
-            <input required min="1" type="number" className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={form.amount || ''} onChange={(e) => setForm({ ...form, amount: Number(e.target.value) })} />
-          </label>
-          <label className="block text-sm font-semibold text-text">Fecha
-            <input required type="date" className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-          </label>
-        </div>
-        <label className="block text-sm font-semibold text-text">Categoria
-          <select required className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={form.category_id} onChange={(e) => setForm({ ...form, category_id: Number(e.target.value) })}>
-            {available.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
-          </select>
-        </label>
-        <label className="block text-sm font-semibold text-text">Descripcion
-          <input required className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ej: Almuerzo, salario, mercado" />
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-semibold text-text">Metodo de pago
-            <input className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={form.payment_method || ''} onChange={(e) => setForm({ ...form, payment_method: e.target.value })} />
-          </label>
-          <label className="block text-sm font-semibold text-text">Lugar
-            <input className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={form.place || ''} onChange={(e) => setForm({ ...form, place: e.target.value })} />
-          </label>
-        </div>
-        <label className="block text-sm font-semibold text-text">Nota
-          <textarea className="mt-1 w-full rounded-lg border border-border px-3 py-3" value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} />
-        </label>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm text-text"><input type="checkbox" checked={form.is_necessary} onChange={(e) => setForm({ ...form, is_necessary: e.target.checked })} /> Es necesario</label>
-          <label className="flex items-center gap-2 text-sm text-text"><input type="checkbox" checked={form.is_recurring} onChange={(e) => setForm({ ...form, is_recurring: e.target.checked })} /> Es recurrente</label>
-        </div>
-        {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-expense">{error}</p>}
-        {message && <p className="rounded-lg bg-green-50 p-3 text-sm text-income">{message}</p>}
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-4 font-semibold text-white"><Save className="h-5 w-5" /> Guardar movimiento</button>
-      </form>
-    </div>
-  );
+  return <div className="mx-auto max-w-2xl"><UnsavedChangesGuard dirty={dirty} /><h1 className="text-2xl font-bold">Agregar movimiento</h1><p className="mt-1 text-sm text-muted">Valores enteros en pesos colombianos (COP).</p><div className="mt-4"><AccountSelector /></div><form onSubmit={submit} className="mt-4 space-y-4 rounded-lg border bg-white p-4 shadow-sm">
+    <label className="block text-sm font-semibold">Tipo<select className="mt-1 w-full rounded-lg border px-3 py-3" value={form.type} onChange={(event) => update({ type: event.target.value as MovementType, adjustment_direction: event.target.value === 'adjustment' ? 'in' : undefined })}><option value="expense">Gasto</option><option value="income">Ingreso</option><option value="purchase">Compra</option><option value="transfer">Transferencia</option><option value="adjustment">Ajuste</option></select></label>
+    {form.type === 'transfer' && <label className="block text-sm font-semibold">Cuenta de destino<select required className="mt-1 w-full rounded-lg border px-3 py-3" value={form.destination_account_id || ''} onChange={(event) => update({ destination_account_id: Number(event.target.value) })}><option value="">Selecciona otra cuenta</option>{accounts.filter((account) => account.id !== activeAccountId).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>}
+    {form.type === 'adjustment' && <fieldset><legend className="text-sm font-semibold">Direccion del ajuste</legend><div className="mt-2 grid grid-cols-2 gap-2"><label className="rounded-lg border p-3"><input type="radio" checked={form.adjustment_direction === 'in'} onChange={() => update({ adjustment_direction: 'in' })} /> Aumenta saldo</label><label className="rounded-lg border p-3"><input type="radio" checked={form.adjustment_direction === 'out'} onChange={() => update({ adjustment_direction: 'out' })} /> Reduce saldo</label></div></fieldset>}
+    <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Valor<input required min="1" max="1000000000000" step="1" type="number" className="mt-1 w-full rounded-lg border px-3 py-3" value={form.amount || ''} onChange={(event) => update({ amount: Number(event.target.value) })} /></label><label className="text-sm font-semibold">Fecha<input required type="date" className="mt-1 w-full rounded-lg border px-3 py-3" value={form.date} onChange={(event) => update({ date: event.target.value })} /></label></div>
+    <label className="block text-sm font-semibold">Categoria<select required className="mt-1 w-full rounded-lg border px-3 py-3" value={selectedCategoryId} onChange={(event) => update({ category_id: Number(event.target.value) })}>{available.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+    <label className="block text-sm font-semibold">Descripcion<input required maxLength={200} className="mt-1 w-full rounded-lg border px-3 py-3" value={form.description} onChange={(event) => update({ description: event.target.value })} /></label>
+    <div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-semibold">Metodo de pago<input maxLength={80} className="mt-1 w-full rounded-lg border px-3 py-3" value={form.payment_method} onChange={(event) => update({ payment_method: event.target.value })} /></label><label className="text-sm font-semibold">Lugar<input maxLength={200} className="mt-1 w-full rounded-lg border px-3 py-3" value={form.place} onChange={(event) => update({ place: event.target.value })} /></label></div>
+    <label className="block text-sm font-semibold">Nota<textarea maxLength={1000} rows={3} className="mt-1 w-full rounded-lg border px-3 py-3" value={form.notes} onChange={(event) => update({ notes: event.target.value })} /></label>
+    <div className="flex flex-wrap gap-4"><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={form.is_necessary} onChange={(event) => update({ is_necessary: event.target.checked })} /> Es necesario</label><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={form.is_recurring} onChange={(event) => update({ is_recurring: event.target.checked })} /> Es recurrente</label></div>
+    {save.error && <p className="rounded-lg bg-red-50 p-3 text-sm text-expense">{save.error instanceof Error ? save.error.message : 'No se pudo guardar.'}</p>}{message && <p className="rounded-lg bg-green-50 p-3 text-sm text-income">{message}</p>}
+    <button disabled={save.isPending} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 font-semibold text-white disabled:opacity-60"><Save className="h-5 w-5" />{save.isPending ? 'Guardando...' : 'Guardar movimiento'}</button>
+  </form></div>;
 }

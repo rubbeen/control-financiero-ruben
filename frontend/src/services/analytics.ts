@@ -1,101 +1,106 @@
-import { Budget, MonthlyData, MonthlySummary, Movement, Recommendation } from '../types/finance';
-import { budgetsService } from './budgets';
-import { categoriesService } from './categories';
-import { movementsService } from './movements';
+import { Budget, Category, MonthlyData, MonthlySummary, Movement, Recommendation } from '../types/finance';
+import { perfMeasureAsync } from '../utils/performance';
+import { decorateMovements, movementsService } from './movements';
 
-const expenseTypes = new Set(['expense', 'purchase', 'adjustment']);
-
-function money(value: number): string {
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+export interface FinancialDataset {
+  movements: Movement[];
+  latestMovements: Movement[];
+  categories: Category[];
+  budget: Budget | null;
+  currentBalance: number;
 }
 
-function previousMonth(year: number, month: number) {
-  return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
+export interface FinancialAnalysis extends MonthlyData {
+  currentBalance: number;
+  trends: { year: number; month: number; label: string; income: number; expense: number; saving: number; balance: number }[];
+  latestMovements: Movement[];
+  documentsReadMaximum: number;
 }
 
-function totals(rows: Movement[]) {
-  const total_income = rows.filter((item) => item.type === 'income').reduce((sum, item) => sum + item.amount, 0);
-  const total_expense = rows.filter((item) => expenseTypes.has(item.type)).reduce((sum, item) => sum + item.amount, 0);
-  return { total_income, total_expense, balance: total_income - total_expense };
+const money = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+const periodKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`;
+const monthStart = (year: number, month: number) => `${periodKey(year, month)}-01`;
+const monthEnd = (year: number, month: number) => `${periodKey(year, month)}-31`;
+
+function shiftMonth(year: number, month: number, delta: number) {
+  const date = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
 }
 
-async function buildSummary(year: number, month: number): Promise<MonthlySummary> {
-  const [rows, categories] = await Promise.all([movementsService.list(year, month), categoriesService.list(true)]);
-  let budget: Budget | null = null;
-  try {
-    budget = await budgetsService.get(year, month);
-  } catch {
-    budget = null;
-  }
-  const base = totals(rows);
-  const expenseRows = rows.filter((item) => expenseTypes.has(item.type));
-  const expenseDays = new Set(expenseRows.map((item) => item.date));
-  const byCategory = categories
-    .map((category) => ({
-      category_id: category.id,
-      category: category.name,
-      color: category.color || '#2563EB',
-      amount: expenseRows.filter((item) => item.category_id === category.id).reduce((sum, item) => sum + item.amount, 0)
-    }))
-    .filter((item) => item.amount > 0)
-    .sort((a, b) => b.amount - a.amount);
+function monthlyBalanceDelta(item: Movement) {
+  if (item.type === 'income') return item.amount;
+  if (item.type === 'expense' || item.type === 'purchase') return -item.amount;
+  if (item.type === 'adjustment' && item.adjustment_direction === 'in') return item.amount;
+  if (item.type === 'adjustment' && item.adjustment_direction === 'out') return -item.amount;
+  return 0;
+}
 
-  const byDay = Array.from(expenseDays).map((day) => ({
-    date: day,
-    amount: expenseRows.filter((item) => item.date === day).reduce((sum, item) => sum + item.amount, 0)
-  }));
-  const highestDay = byDay.sort((a, b) => b.amount - a.amount)[0];
+function summarize(rows: Movement[], categories: Category[], year: number, month: number, budget: Budget | null): MonthlySummary {
+  const categoryMap = new Map(categories.map((item) => [item.id, item]));
+  const categoryTotals = new Map<number, number>();
+  const dayTotals = new Map<string, number>();
+  const expenses: Movement[] = [];
+  let totalIncome = 0;
+  let totalExpense = 0;
+  let balance = 0;
+  let necessary = 0;
+  let unnecessary = 0;
+
+  rows.forEach((item) => {
+    balance += monthlyBalanceDelta(item);
+    if (item.type === 'income') totalIncome += item.amount;
+    if (item.type !== 'expense' && item.type !== 'purchase') return;
+    expenses.push(item);
+    totalExpense += item.amount;
+    categoryTotals.set(item.category_id, (categoryTotals.get(item.category_id) || 0) + item.amount);
+    dayTotals.set(item.date, (dayTotals.get(item.date) || 0) + item.amount);
+    if (item.is_necessary) necessary += item.amount;
+    else unnecessary += item.amount;
+  });
+
+  const categoryExpenses = [...categoryTotals.entries()].map(([categoryId, amount]) => ({
+    category_id: categoryId,
+    category: categoryMap.get(categoryId)?.name || 'Sin categoria',
+    color: categoryMap.get(categoryId)?.color || '#6B7280',
+    amount
+  })).sort((a, b) => b.amount - a.amount);
+  const highestDay = [...dayTotals.entries()].map(([date, amount]) => ({ date, amount })).sort((a, b) => b.amount - a.amount)[0];
   const messages: string[] = [];
   if (!rows.length) messages.push('No existen movimientos registrados en este periodo.');
-  if (!budget) {
-    messages.push('No se ha definido presupuesto para este mes.');
-    messages.push('No se ha definido meta de ahorro.');
-  } else if (!budget.saving_goal) {
-    messages.push('No se ha definido meta de ahorro.');
-  }
+  if (!budget) messages.push('No se ha definido presupuesto ni meta de ahorro para este mes.');
 
   return {
     year,
     month,
-    total_income: base.total_income,
-    total_expense: base.total_expense,
-    balance: base.balance,
-    saving_amount: base.balance,
-    saving_rate: base.total_income ? (base.balance / base.total_income) * 100 : null,
-    expense_rate: base.total_income ? (base.total_expense / base.total_income) * 100 : null,
-    average_daily_expense: expenseDays.size ? base.total_expense / expenseDays.size : 0,
+    total_income: totalIncome,
+    total_expense: totalExpense,
+    balance,
+    saving_amount: balance,
+    saving_rate: totalIncome ? (balance / totalIncome) * 100 : null,
+    expense_rate: totalIncome ? (totalExpense / totalIncome) * 100 : null,
+    average_daily_expense: dayTotals.size ? totalExpense / dayTotals.size : 0,
     highest_expense_day: highestDay,
-    top_expense_category: byCategory[0],
-    necessary_expenses: expenseRows.filter((item) => item.is_necessary).reduce((sum, item) => sum + item.amount, 0),
-    unnecessary_expenses: expenseRows.filter((item) => !item.is_necessary).reduce((sum, item) => sum + item.amount, 0),
-    category_expenses: byCategory,
-    top_expenses: expenseRows
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 10)
-      .map((item) => ({ id: item.id, date: item.date, description: item.description, amount: item.amount, category_id: item.category_id })),
+    top_expense_category: categoryExpenses[0],
+    necessary_expenses: necessary,
+    unnecessary_expenses: unnecessary,
+    category_expenses: categoryExpenses,
+    top_expenses: expenses.sort((a, b) => b.amount - a.amount).slice(0, 10).map((item) => ({ id: item.id, date: item.date, description: item.description, amount: item.amount, category_id: item.category_id })),
     budget,
     messages
   };
 }
 
 function variation(current: number, previous: number) {
-  return {
-    absolute: current - previous,
-    percent: previous ? ((current - previous) / previous) * 100 : null
-  };
+  return { absolute: current - previous, percent: previous ? ((current - previous) / previous) * 100 : null };
 }
 
-async function buildComparison(year: number, month: number) {
-  const current = await buildSummary(year, month);
-  const prev = previousMonth(year, month);
-  const previous = await buildSummary(prev.year, prev.month);
-  if (!previous.total_income && !previous.total_expense) {
-    return { current, previous, message: 'No existe mes anterior para comparar.', expense_variation: null, income_variation: null, largest_category_increase: null };
-  }
-  const increases = current.category_expenses.map((item) => {
-    const old = previous.category_expenses.find((prevItem) => prevItem.category_id === item.category_id)?.amount || 0;
-    return { ...item, increase: item.amount - old };
-  });
+function compare(current: MonthlySummary, previous: MonthlySummary) {
+  if (!previous.total_income && !previous.total_expense) return { current, previous, message: 'No existe mes anterior para comparar.', expense_variation: null, income_variation: null, balance_variation: null, largest_category_increase: null };
+  const previousCategories = new Map(previous.category_expenses.map((item) => [item.category_id, item.amount]));
+  const largest = current.category_expenses
+    .map((item) => ({ ...item, increase: item.amount - (previousCategories.get(item.category_id) || 0) }))
+    .filter((item) => item.increase > 0)
+    .sort((a, b) => b.increase - a.increase)[0] || null;
   return {
     current,
     previous,
@@ -103,120 +108,70 @@ async function buildComparison(year: number, month: number) {
     expense_variation: variation(current.total_expense, previous.total_expense),
     income_variation: variation(current.total_income, previous.total_income),
     balance_variation: variation(current.balance, previous.balance),
-    largest_category_increase: increases.filter((item) => item.increase > 0).sort((a, b) => b.increase - a.increase)[0] || null
+    largest_category_increase: largest
   };
 }
 
-async function buildRecommendations(year: number, month: number): Promise<Recommendation[]> {
-  const summary = await buildSummary(year, month);
-  const comparison = await buildComparison(year, month);
-  const recs: Recommendation[] = [];
+function recommendations(summary: MonthlySummary, comparison: ReturnType<typeof compare>): Recommendation[] {
+  const result: Recommendation[] = [];
   const top = summary.top_expense_category;
-
-  if (summary.total_expense > summary.total_income && top) {
-    recs.push({
-      title: 'Gastos por encima de ingresos',
-      explanation: `Este mes tus gastos superaron tus ingresos por ${money(summary.total_expense - summary.total_income)}. Revisa principalmente la categoria ${top.category}.`,
-      affected_value: summary.total_expense - summary.total_income,
-      suggested_action: 'Reduce o aplaza gastos no necesarios antes de registrar nuevos compromisos.',
-      level: 'critico'
-    });
-  }
-
-  if (top && summary.total_expense) {
-    const percent = (top.amount / summary.total_expense) * 100;
-    if (percent > 30) {
-      recs.push({
-        title: 'Alta concentracion por categoria',
-        explanation: `La categoria ${top.category} representa el ${percent.toFixed(1)}% de tus gastos del mes. Es tu mayor concentracion de consumo.`,
-        affected_value: top.amount,
-        suggested_action: 'Define un limite concreto para esta categoria y revisalo semanalmente.',
-        level: 'advertencia'
-      });
-    }
-  }
-
-  const expenseVariation = comparison.expense_variation;
-  if (expenseVariation?.percent !== null && expenseVariation?.percent !== undefined) {
-    if (expenseVariation.absolute > 0) {
-      recs.push({
-        title: 'Aumento frente al mes anterior',
-        explanation: `Tus gastos aumentaron ${expenseVariation.percent.toFixed(1)}% frente al mes anterior. La mayor variacion estuvo en la categoria ${comparison.largest_category_increase?.category || 'sin categoria identificada'}.`,
-        affected_value: expenseVariation.absolute,
-        suggested_action: 'Compara los movimientos de esa categoria y decide cuales no se repiten.',
-        level: 'advertencia'
-      });
-    } else if (expenseVariation.absolute < 0) {
-      recs.push({
-        title: 'Reduccion de gastos',
-        explanation: `Tus gastos disminuyeron ${Math.abs(expenseVariation.percent).toFixed(1)}% frente al mes anterior.`,
-        affected_value: Math.abs(expenseVariation.absolute),
-        suggested_action: 'Manten las decisiones que redujeron el gasto este mes.',
-        level: 'positivo'
-      });
-    }
-  }
-
+  if (summary.total_expense > summary.total_income && top) result.push({ title: 'Gastos por encima de ingresos', explanation: `Este mes los gastos superaron los ingresos por ${money(summary.total_expense - summary.total_income)}.`, affected_value: summary.total_expense - summary.total_income, suggested_action: `Revisa primero la categoria ${top.category}.`, level: 'critico' });
+  if (top && summary.total_expense && top.amount / summary.total_expense > 0.3) result.push({ title: 'Gasto concentrado', explanation: `${top.category} representa ${((top.amount / summary.total_expense) * 100).toFixed(1)}% del gasto mensual.`, affected_value: top.amount, suggested_action: 'Define un limite semanal para esta categoria.', level: 'advertencia' });
+  if (comparison.expense_variation?.percent != null && comparison.expense_variation.absolute > 0) result.push({ title: 'Aumento frente al mes anterior', explanation: `Los gastos aumentaron ${comparison.expense_variation.percent.toFixed(1)}%.`, affected_value: comparison.expense_variation.absolute, suggested_action: 'Compara los movimientos que explican el aumento.', level: 'advertencia' });
   if (summary.budget?.saving_goal) {
-    const diff = summary.saving_amount - summary.budget.saving_goal;
-    recs.push({
-      title: diff >= 0 ? 'Meta de ahorro cumplida' : 'Meta de ahorro pendiente',
-      explanation: diff >= 0 ? `Cumpliste tu meta de ahorro. Superaste la meta por ${money(diff)}.` : `No alcanzaste tu meta de ahorro. Te faltaron ${money(Math.abs(diff))} para cumplirla.`,
-      affected_value: Math.abs(diff),
-      suggested_action: diff >= 0 ? 'Conserva este excedente como ahorro o fondo de emergencia.' : 'Separa primero el ahorro al recibir ingresos y ajusta gastos variables.',
-      level: diff >= 0 ? 'positivo' : 'advertencia'
-    });
+    const difference = summary.saving_amount - summary.budget.saving_goal;
+    result.push({ title: difference >= 0 ? 'Meta de ahorro cumplida' : 'Meta de ahorro pendiente', explanation: difference >= 0 ? `Superaste la meta por ${money(difference)}.` : `Faltan ${money(Math.abs(difference))}.`, affected_value: Math.abs(difference), suggested_action: difference >= 0 ? 'Conserva el excedente.' : 'Separa el ahorro antes de gastar.', level: difference >= 0 ? 'positivo' : 'advertencia' });
   }
+  if (!result.length && summary.total_income) result.push({ title: 'Mes bajo control', explanation: `El balance mensual es ${money(summary.balance)}.`, affected_value: summary.balance, suggested_action: 'Continua registrando cada movimiento.', level: 'positivo' });
+  return result;
+}
 
-  if (summary.budget?.unnecessary_expense_limit) {
-    const extra = summary.unnecessary_expenses - summary.budget.unnecessary_expense_limit;
-    if (extra > 0) {
-      recs.push({
-        title: 'Gastos no necesarios sobre el limite',
-        explanation: `Tus gastos no necesarios superaron el limite definido por ${money(extra)}.`,
-        affected_value: extra,
-        suggested_action: 'Congela compras no necesarias hasta volver al limite.',
-        level: 'advertencia'
-      });
-    }
-  }
+export async function loadFinancialDataset({ uid, accountId, year, month, trendMonths, categories, budget, currentBalance }: { uid: string; accountId: number; year: number; month: number; trendMonths: number; categories: Category[]; budget: Budget | null; currentBalance: number }): Promise<FinancialDataset> {
+  const trendStart = shiftMonth(year, month, -(Math.max(trendMonths, 2) - 1));
+  const previous = shiftMonth(year, month, -1);
+  const start = trendStart.year < previous.year || (trendStart.year === previous.year && trendStart.month < previous.month) ? trendStart : previous;
+  return perfMeasureAsync('firestore-financial-dataset', async () => {
+    const [movements, latestMovements] = await Promise.all([
+      movementsService.getAllByRange({ uid, accountId, startDate: monthStart(start.year, start.month), endDate: monthEnd(year, month) }),
+      movementsService.getLatestMovements({ uid, accountId, count: 5 })
+    ]);
+    return { movements, latestMovements, categories, budget, currentBalance };
+  });
+}
 
-  if (!recs.length && summary.total_income) {
-    recs.push({
-      title: 'Mes bajo control',
-      explanation: `Tu balance actual es ${money(summary.balance)} con ingresos reales por ${money(summary.total_income)}.`,
-      affected_value: summary.balance,
-      suggested_action: 'Continua registrando movimientos para mejorar el analisis.',
-      level: 'positivo'
-    });
-  }
-
-  return recs;
+export function calculateFinancialAnalysis({ dataset, year, month, trendMonths }: { dataset: FinancialDataset; year: number; month: number; trendMonths: number }): FinancialAnalysis {
+  performance.mark('financial-analysis:start');
+  const groups = new Map<string, Movement[]>();
+  dataset.movements.forEach((item) => {
+    const key = item.date.slice(0, 7);
+    const group = groups.get(key) || [];
+    group.push(item);
+    groups.set(key, group);
+  });
+  const previousPeriod = shiftMonth(year, month, -1);
+  const current = summarize(groups.get(periodKey(year, month)) || [], dataset.categories, year, month, dataset.budget);
+  const previous = summarize(groups.get(periodKey(previousPeriod.year, previousPeriod.month)) || [], dataset.categories, previousPeriod.year, previousPeriod.month, null);
+  const comparison = compare(current, previous);
+  const trends = Array.from({ length: trendMonths }, (_, index) => shiftMonth(year, month, index - trendMonths + 1)).map((period) => {
+    const summary = summarize(groups.get(periodKey(period.year, period.month)) || [], dataset.categories, period.year, period.month, period.year === year && period.month === month ? dataset.budget : null);
+    return { year: period.year, month: period.month, label: periodKey(period.year, period.month), income: summary.total_income, expense: summary.total_expense, saving: summary.saving_amount, balance: summary.balance };
+  });
+  performance.mark('financial-analysis:end');
+  performance.measure('financial-analysis', 'financial-analysis:start', 'financial-analysis:end');
+  return {
+    summary: current,
+    comparison,
+    recommendations: recommendations(current, comparison),
+    currentBalance: dataset.currentBalance,
+    trends,
+    latestMovements: decorateMovements(dataset.latestMovements, dataset.categories),
+    documentsReadMaximum: 2000 + 20 + dataset.categories.length + 2
+  };
 }
 
 export const analyticsService = {
-  summary: buildSummary,
-  async monthly(year: number, month: number): Promise<MonthlyData> {
-    return {
-      summary: await buildSummary(year, month),
-      comparison: await buildComparison(year, month),
-      recommendations: await buildRecommendations(year, month)
-    };
-  },
-  comparison: buildComparison,
-  async trends(months = 6) {
-    const now = new Date();
-    const result = [];
-    let year = now.getFullYear();
-    let month = now.getMonth() + 1;
-    for (let index = 0; index < months; index += 1) {
-      const summary = await buildSummary(year, month);
-      result.push({ year, month, label: `${year}-${String(month).padStart(2, '0')}`, income: summary.total_income, expense: summary.total_expense, saving: summary.saving_amount, balance: summary.balance });
-      const prev = previousMonth(year, month);
-      year = prev.year;
-      month = prev.month;
-    }
-    return result.reverse();
-  },
-  recommendations: buildRecommendations
+  async load(uid: string, accountId: number, year: number, month: number, trendMonths: number, categories: Category[], budget: Budget | null, currentBalance: number) {
+    const dataset = await loadFinancialDataset({ uid, accountId, year, month, trendMonths, categories, budget, currentBalance });
+    return perfMeasureAsync('financial-analysis-calculation', async () => calculateFinancialAnalysis({ dataset, year, month, trendMonths }));
+  }
 };

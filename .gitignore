@@ -8,6 +8,14 @@ frontend/android/.gradle/
 frontend/android/build/
 frontend/android/app/build/
 frontend/android/local.properties
+frontend/android/keystore.properties
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+firestore-debug.log
+frontend/firestore-debug.log
+*.jks
+*.keystore
 data/*.db
 exports/*
 !exports/.gitkeep

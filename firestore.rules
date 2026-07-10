@@ -1,26 +1,182 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isOwner() {
+    function isOwner(userId) {
       return request.auth != null
-        && request.auth.token.email == 'ribenp7@gmail.com';
+        && request.auth.uid == userId
+        && request.auth.token.email == 'ribenp7@gmail.com'
+        && request.auth.token.email_verified == true;
     }
 
-    match /accounts/{documentId} {
-      allow read, write: if isOwner();
+    function validDate(value) {
+      return value is string && value.matches('^\\d{4}-(0[1-9]|1[0-2])-([0-2]\\d|3[0-1])$');
     }
 
-    match /categories/{documentId} {
-      allow read, write: if isOwner();
+    function validAudit(data) {
+      return data.created_at is string && data.created_at.size() <= 40
+        && data.updated_at is string && data.updated_at.size() <= 40;
     }
 
-    match /movements/{documentId} {
-      allow read, write: if isOwner();
+    function immutableIdentity() {
+      return request.resource.data.id == resource.data.id
+        && request.resource.data.created_at == resource.data.created_at;
     }
 
-    match /budgets/{documentId} {
-      allow read, write: if isOwner();
+    function validAccount(data) {
+      return data.keys().hasOnly(['id', 'name', 'description', 'color', 'icon', 'active', 'current_balance', 'created_at', 'updated_at'])
+        && data.keys().hasAll(['id', 'name', 'description', 'color', 'icon', 'active', 'current_balance', 'created_at', 'updated_at'])
+        && data.id is int && data.id > 0
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.description is string && data.description.size() <= 300
+        && data.color is string && data.color.size() <= 20
+        && data.icon is string && data.icon.size() <= 50
+        && data.active is bool
+        && data.current_balance is int
+        && validAudit(data);
+    }
+
+    function validCategory(data) {
+      return data.keys().hasOnly(['id', 'name', 'type', 'color', 'icon', 'active', 'created_at', 'updated_at'])
+        && data.keys().hasAll(['id', 'name', 'type', 'color', 'icon', 'active', 'created_at', 'updated_at'])
+        && data.id is int && data.id > 0
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.type in ['income', 'expense', 'both']
+        && data.color is string && data.color.size() <= 20
+        && data.icon is string && data.icon.size() <= 50
+        && data.active is bool
+        && validAudit(data);
+    }
+
+    function validOptionalText(data, field, maxSize) {
+      return !data.keys().hasAny([field]) || (data[field] is string && data[field].size() <= maxSize);
+    }
+
+    function validTransfer(data) {
+      return data.type != 'transfer' || (
+        data.keys().hasAll(['source_account_id', 'destination_account_id', 'transfer_group_id', 'transfer_direction'])
+        && data.source_account_id is int && data.source_account_id > 0
+        && data.destination_account_id is int && data.destination_account_id > 0
+        && data.source_account_id != data.destination_account_id
+        && data.transfer_group_id is string && data.transfer_group_id.size() >= 8 && data.transfer_group_id.size() <= 80
+        && data.transfer_direction in ['in', 'out']
+        && ((data.transfer_direction == 'out' && data.account_id == data.source_account_id)
+          || (data.transfer_direction == 'in' && data.account_id == data.destination_account_id))
+      );
+    }
+
+    function validAdjustment(data) {
+      return data.type != 'adjustment'
+        || (data.keys().hasAll(['adjustment_direction']) && data.adjustment_direction in ['in', 'out']);
+    }
+
+    function validMovement(data) {
+      return data.keys().hasOnly([
+          'id', 'account_id', 'type', 'amount', 'date', 'category_id', 'description',
+          'payment_method', 'notes', 'tag', 'place', 'is_necessary', 'is_recurring',
+          'adjustment_direction', 'source_account_id', 'destination_account_id',
+          'transfer_group_id', 'transfer_direction', 'needs_review', 'created_at', 'updated_at'
+        ])
+        && data.keys().hasAll(['id', 'account_id', 'type', 'amount', 'date', 'category_id', 'description', 'is_necessary', 'is_recurring', 'created_at', 'updated_at'])
+        && data.id is int && data.id > 0
+        && data.account_id is int && data.account_id > 0
+        && data.type in ['income', 'expense', 'purchase', 'transfer', 'adjustment']
+        && data.amount is int && data.amount > 0 && data.amount <= 1000000000000
+        && validDate(data.date)
+        && data.category_id is int && data.category_id > 0
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 200
+        && validOptionalText(data, 'notes', 1000)
+        && validOptionalText(data, 'tag', 80)
+        && validOptionalText(data, 'place', 200)
+        && validOptionalText(data, 'payment_method', 80)
+        && (!data.keys().hasAny(['needs_review']) || data.needs_review is bool)
+        && data.is_necessary is bool && data.is_recurring is bool
+        && validTransfer(data) && validAdjustment(data) && validAudit(data);
+    }
+
+    function validCategoryBudget(item) {
+      return item is map
+        && item.keys().hasOnly(['category_id', 'amount_limit'])
+        && item.keys().hasAll(['category_id', 'amount_limit'])
+        && item.category_id is int && item.category_id > 0
+        && item.amount_limit is int && item.amount_limit >= 0 && item.amount_limit <= 1000000000000;
+    }
+
+    function validCategoryBudgets(items) {
+      return items is list && items.size() <= 10
+        && (items.size() < 1 || validCategoryBudget(items[0]))
+        && (items.size() < 2 || validCategoryBudget(items[1]))
+        && (items.size() < 3 || validCategoryBudget(items[2]))
+        && (items.size() < 4 || validCategoryBudget(items[3]))
+        && (items.size() < 5 || validCategoryBudget(items[4]))
+        && (items.size() < 6 || validCategoryBudget(items[5]))
+        && (items.size() < 7 || validCategoryBudget(items[6]))
+        && (items.size() < 8 || validCategoryBudget(items[7]))
+        && (items.size() < 9 || validCategoryBudget(items[8]))
+        && (items.size() < 10 || validCategoryBudget(items[9]));
+    }
+
+    function validBudget(data) {
+      return data.keys().hasOnly(['id', 'account_id', 'year', 'month', 'total_budget', 'saving_goal', 'unnecessary_expense_limit', 'category_budgets', 'created_at', 'updated_at'])
+        && data.keys().hasAll(['id', 'account_id', 'year', 'month', 'total_budget', 'saving_goal', 'unnecessary_expense_limit', 'category_budgets', 'created_at', 'updated_at'])
+        && data.id is int && data.id > 0
+        && data.account_id is int && data.account_id > 0
+        && data.year is int && data.year >= 2000 && data.year <= 2200
+        && data.month is int && data.month >= 1 && data.month <= 12
+        && data.total_budget is int && data.total_budget >= 0 && data.total_budget <= 1000000000000
+        && data.saving_goal is int && data.saving_goal >= 0 && data.saving_goal <= 1000000000000
+        && data.unnecessary_expense_limit is int && data.unnecessary_expense_limit >= 0 && data.unnecessary_expense_limit <= 1000000000000
+        && validCategoryBudgets(data.category_budgets)
+        && validAudit(data);
+    }
+
+    match /users/{userId}/accounts/{documentId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && validAccount(request.resource.data);
+      allow update: if isOwner(userId) && immutableIdentity() && validAccount(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/categories/{documentId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && validCategory(request.resource.data);
+      allow update: if isOwner(userId) && immutableIdentity() && validCategory(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/movements/{documentId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && validMovement(request.resource.data);
+      allow update: if isOwner(userId) && immutableIdentity() && validMovement(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/budgets/{documentId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && validBudget(request.resource.data);
+      allow update: if isOwner(userId) && immutableIdentity() && validBudget(request.resource.data);
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/meta/counters {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(['accountId', 'categoryId', 'movementId', 'budgetId'])
+        && (!request.resource.data.keys().hasAny(['accountId']) || (request.resource.data.accountId is int && request.resource.data.accountId >= 0))
+        && (!request.resource.data.keys().hasAny(['categoryId']) || (request.resource.data.categoryId is int && request.resource.data.categoryId >= 0))
+        && (!request.resource.data.keys().hasAny(['movementId']) || (request.resource.data.movementId is int && request.resource.data.movementId >= 0))
+        && (!request.resource.data.keys().hasAny(['budgetId']) || (request.resource.data.budgetId is int && request.resource.data.budgetId >= 0));
+      allow delete: if false;
+    }
+
+    match /users/{userId}/meta/initialization {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(['categoriesSeedVersion', 'defaultAccountCreated', 'initializedAt'])
+        && request.resource.data.categoriesSeedVersion is int
+        && request.resource.data.categoriesSeedVersion >= 0
+        && request.resource.data.defaultAccountCreated is bool
+        && request.resource.data.initializedAt is string;
+      allow delete: if false;
     }
 
     match /{document=**} {

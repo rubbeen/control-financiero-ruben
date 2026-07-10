@@ -1,8 +1,9 @@
-# Instalacion
+# Instalacion local
 
-1. Ejecuta `start-backend.bat`.
-2. Ejecuta `start-frontend.bat`.
-3. Configura en el celular la URL `http://IP-LOCAL-PC:8000`.
-4. Para APK, entra a `frontend` y ejecuta `npm run build`, `npx cap add android`, `npx cap sync android` y `npx cap open android`.
+1. Instala Node compatible y ejecuta `npm ci` dentro de `frontend`.
+2. Usa `npm run dev` para web o `npm run cap:sync` para sincronizar Android.
+3. Configura Android SDK y JDK 21.
+4. Genera debug con `frontend/android/gradlew.bat assembleDebug`.
+5. Para release, configura un keystore externo siguiendo `HARDENING_REPORT/RELEASE_GUIDE.md`.
 
-Si el celular no conecta, revisa que ambos equipos esten en la misma WiFi y que Windows Firewall permita el puerto 8000.
+No se inicia backend, no se abre puerto 8000 y no se configura IP del computador.

@@ -9,6 +9,7 @@ export interface FinanceAccount {
   color?: string;
   icon?: string;
   active: boolean;
+  current_balance: number;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +41,12 @@ export interface Movement {
   place?: string;
   is_necessary: boolean;
   is_recurring: boolean;
+  adjustment_direction?: 'in' | 'out';
+  source_account_id?: number;
+  destination_account_id?: number;
+  transfer_group_id?: string;
+  transfer_direction?: 'in' | 'out';
+  needs_review?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -57,6 +64,9 @@ export interface MovementInput {
   place?: string;
   is_necessary: boolean;
   is_recurring: boolean;
+  adjustment_direction?: 'in' | 'out';
+  source_account_id?: number;
+  destination_account_id?: number;
 }
 
 export interface CategoryBudget {
@@ -77,6 +87,14 @@ export interface Budget {
   category_budgets: CategoryBudget[];
   created_at: string;
   updated_at: string;
+}
+
+export interface MovementFilters {
+  startDate: string;
+  endDate: string;
+  categoryId?: number;
+  type?: MovementType;
+  pageSize?: number;
 }
 
 export interface Recommendation {

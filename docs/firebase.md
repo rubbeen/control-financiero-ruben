@@ -1,30 +1,14 @@
-# Firebase Firestore
+# Firebase Firestore v1.3.0
 
-La version actual de la app usa Firebase Firestore como base de datos principal. Esto permite usar la app desde el celular con internet aunque el computador este apagado.
+Proyecto esperado: `control-financiero-ruben`, plan Spark. Los datos nuevos viven en:
 
-## Configuracion usada
+- `users/{uid}/accounts`
+- `users/{uid}/categories`
+- `users/{uid}/movements`
+- `users/{uid}/budgets`
+- `users/{uid}/meta/counters`
+- `users/{uid}/meta/initialization`
 
-- Proyecto: `control-financiero-ruben`
-- Base de datos: Cloud Firestore
-- App web registrada en Firebase
-- Plan: Spark
+Las reglas finales exigen autenticacion, UID coincidente, `ribenp7@gmail.com` y correo verificado. Tambien validan campos y bloquean colecciones raiz. Storage permanece totalmente cerrado.
 
-## Colecciones
-
-- `categories`
-- `movements`
-- `budgets`
-
-## Reglas
-
-Durante pruebas puede funcionar en modo de prueba. Cuando confirmes que todo guarda bien, protege Firestore con reglas mas estrictas. Sin autenticacion, cualquier regla abierta permite acceso publico a los datos.
-
-Mejora recomendada:
-
-- Activar autenticacion anonima o email/password.
-- Guardar datos bajo `users/{userId}`.
-- Permitir lectura/escritura solo al usuario autenticado.
-
-## Nota de privacidad
-
-Firebase es un servicio en la nube. No pide claves bancarias y no se conecta a bancos, pero los datos financieros manuales se guardan en internet bajo el proyecto Firebase configurado.
+No publiques reglas finales antes de completar `MIGRATION_RUNBOOK.md`, porque el cliente anterior y los datos raiz dejarian de funcionar.

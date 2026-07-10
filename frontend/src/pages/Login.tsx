@@ -1,10 +1,10 @@
 import { FormEvent, useState } from 'react';
 import { Lock, Mail, ShieldCheck } from 'lucide-react';
 import AppLogo from '../components/AppLogo';
-import { loginWithEmail, OWNER_EMAIL, resetOwnerPassword } from '../services/auth';
+import { authErrorMessage, loginWithEmail, resetOwnerPassword } from '../services/auth';
 
 export default function Login() {
-  const [email, setEmail] = useState(OWNER_EMAIL);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -17,8 +17,8 @@ export default function Login() {
     setMessage('');
     try {
       await loginWithEmail(email, password);
-    } catch (err: any) {
-      setError(err.message || 'No pude iniciar sesion. Revisa el correo y la contrasena.');
+    } catch (err) {
+      setError(authErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -30,9 +30,9 @@ export default function Login() {
     setMessage('');
     try {
       await resetOwnerPassword();
-      setMessage(`Te envie un enlace de recuperacion a ${OWNER_EMAIL}.`);
-    } catch (err: any) {
-      setError(err.message || 'No pude enviar el correo de recuperacion.');
+      setMessage('Enviamos un enlace al correo autorizado.');
+    } catch (err) {
+      setError(authErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -41,10 +41,10 @@ export default function Login() {
   return (
     <main className="min-h-screen bg-app px-5 py-8">
       <section className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-md flex-col justify-center">
-        <div className="mb-6 flex items-center gap-3">
+        <div className="mb-6 flex min-w-0 items-center gap-3">
           <AppLogo />
-          <div>
-            <p className="text-xl font-extrabold text-cocoa">Control Financiero Ruben</p>
+          <div className="min-w-0">
+            <p className="break-words text-xl font-extrabold text-cocoa">Control Financiero Ruben</p>
             <p className="text-sm font-medium text-muted">Acceso protegido con Firebase</p>
           </div>
         </div>
@@ -62,7 +62,7 @@ export default function Login() {
             Correo
             <span className="mt-1 flex items-center gap-2 rounded-lg border border-border bg-cream px-3 py-2">
               <Mail className="h-4 w-4 text-muted" />
-              <input className="w-full bg-transparent outline-none" value={email} onChange={(event) => setEmail(event.target.value)} inputMode="email" autoComplete="email" />
+              <input className="min-w-0 flex-1 bg-transparent outline-none" value={email} onChange={(event) => setEmail(event.target.value)} inputMode="email" autoComplete="email" />
             </span>
           </label>
 
@@ -70,7 +70,7 @@ export default function Login() {
             Contrasena
             <span className="mt-1 flex items-center gap-2 rounded-lg border border-border bg-cream px-3 py-2">
               <Lock className="h-4 w-4 text-muted" />
-              <input className="w-full bg-transparent outline-none" value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" />
+              <input className="min-w-0 flex-1 bg-transparent outline-none" value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" />
             </span>
           </label>
 

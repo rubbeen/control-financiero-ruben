@@ -1,118 +1,67 @@
 import { Bot, Calendar, FileText, PieChart, PlusCircle, Settings, Target, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { lazy, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
+import AccountSelector from '../components/AccountSelector';
 import BalanceCard from '../components/BalanceCard';
 import ConnectionStatus from '../components/ConnectionStatus';
 import EmptyState from '../components/EmptyState';
-import ExpenseCategoryChart from '../components/ExpenseCategoryChart';
-import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import MetricCard from '../components/MetricCard';
-import MonthlyTrendChart from '../components/MonthlyTrendChart';
 import MovementItem from '../components/MovementItem';
 import QuickActionButton from '../components/QuickActionButton';
 import RecommendationCard from '../components/RecommendationCard';
-import AccountSelector from '../components/AccountSelector';
-import { analyticsService } from '../services/analytics';
-import { movementsService } from '../services/movements';
-import { useAsync } from '../hooks/useAsync';
+import { useFinancialAnalysis } from '../hooks/useFinanceQueries';
 import { formatCurrency } from '../utils/currency';
 import { currentYearMonth, monthName } from '../utils/dates';
 
-interface Props {
-  setPage: (page: string) => void;
-  openMovement: (id: number) => void;
+const IncomeExpenseChart = lazy(() => import('../components/IncomeExpenseChart'));
+const ExpenseCategoryChart = lazy(() => import('../components/ExpenseCategoryChart'));
+const MonthlyTrendChart = lazy(() => import('../components/MonthlyTrendChart'));
+
+function ChartFallback() {
+  return <div className="skeleton h-72 w-full" aria-label="Cargando grafica" />;
 }
 
-export default function Dashboard({ setPage, openMovement }: Props) {
+export default function Dashboard() {
+  const navigate = useNavigate();
   const { year, month } = currentYearMonth();
-  const monthly = useAsync(() => analyticsService.monthly(year, month), [year, month]);
-  const trends = useAsync(() => analyticsService.trends(6), []);
-  const movements = useAsync(() => movementsService.list(), []);
+  const financial = useFinancialAnalysis(year, month, 6);
 
-  if (monthly.loading) {
-    return (
-      <div className="space-y-4 py-10 text-center">
-        <p className="text-muted">Cargando informacion financiera...</p>
-        <button onClick={() => setPage('settings')} className="rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white">
-          Ver configuracion
-        </button>
-      </div>
-    );
-  }
+  if (financial.isLoading) return <div className="space-y-4" aria-busy="true"><div className="skeleton h-20 w-full" /><div className="skeleton h-40 w-full" /><div className="grid grid-cols-2 gap-3"><div className="skeleton h-24" /><div className="skeleton h-24" /></div></div>;
+  if (financial.isError || !financial.data) return <section className="space-y-3 rounded-lg bg-orange-50 p-4 text-sm text-purchase"><p>No pudimos actualizar tus datos. Revisa tu internet e intenta de nuevo.</p><button onClick={() => void financial.refetch()} className="rounded-lg bg-primary px-4 py-3 font-semibold text-white">Reintentar</button></section>;
 
-  if (monthly.error) {
-    return (
-      <div className="space-y-3 rounded-lg bg-orange-50 p-4 text-sm text-purchase">
-        <p>No se pudo conectar con Firebase. Verifica que el celular tenga internet y que Firestore este activo.</p>
-        <p className="text-xs text-muted">{monthly.error}</p>
-        <button onClick={() => setPage('settings')} className="rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white">
-          Ir a Ajustes
-        </button>
-      </div>
-    );
-  }
-
-  const data = monthly.data!;
+  const data = financial.data;
   const summary = data.summary;
-  const latest = (movements.data || []).slice(0, 5);
-  const budgetUsed = summary.budget?.total_budget ? (summary.total_expense / summary.budget.total_budget) * 100 : 0;
+  const budgetUsed = summary.budget?.total_budget ? Math.min(999, (summary.total_expense / summary.budget.total_budget) * 100) : 0;
 
   return (
     <div className="space-y-5">
-      <section className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Hola, Ruben</h1>
-          <p className="flex items-center gap-1 text-sm capitalize text-muted"><Calendar className="h-4 w-4" /> {monthName(year, month)}</p>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <ConnectionStatus />
-          <button className="text-muted" onClick={() => setPage('settings')} title="Configuracion"><Settings className="h-5 w-5" /></button>
-        </div>
+      <section className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0"><h1 className="truncate text-2xl font-bold text-text">Hola, Ruben</h1><p className="flex items-center gap-1 text-sm capitalize text-muted"><Calendar className="h-4 w-4" /> {monthName(year, month)}</p></div>
+        <div className="flex flex-none flex-col items-end gap-1"><ConnectionStatus /><button className="touch-target text-muted" onClick={() => navigate('/settings')} aria-label="Configuracion"><Settings className="h-5 w-5" /></button></div>
       </section>
-
-      <AccountSelector setPage={setPage} />
-
-      <BalanceCard currentBalance={summary.balance} monthlyBalance={summary.balance} income={summary.total_income} expense={summary.total_expense} />
-
+      <AccountSelector />
+      <BalanceCard currentBalance={data.currentBalance} monthlyBalance={summary.balance} income={summary.total_income} expense={summary.total_expense} />
       <section className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <QuickActionButton label="Agregar gasto" icon={PlusCircle} tone="orange" onClick={() => setPage('add')} />
-        <QuickActionButton label="Agregar ingreso" icon={TrendingUp} tone="green" onClick={() => setPage('add')} />
-        <QuickActionButton label="Analisis IA" icon={Bot} tone="dark" onClick={() => setPage('advisor')} />
-        <QuickActionButton label="Ver reporte" icon={FileText} tone="blue" onClick={() => setPage('reports')} />
-        <QuickActionButton label="Presupuesto" icon={Target} tone="dark" onClick={() => setPage('budget')} />
+        <QuickActionButton label="Agregar gasto" icon={PlusCircle} tone="orange" onClick={() => navigate('/add?tipo=expense')} />
+        <QuickActionButton label="Agregar ingreso" icon={TrendingUp} tone="green" onClick={() => navigate('/add?tipo=income')} />
+        <QuickActionButton label="Asesor financiero" icon={Bot} tone="dark" onClick={() => navigate('/advisor')} />
+        <QuickActionButton label="Ver reporte" icon={FileText} tone="blue" onClick={() => navigate('/reports')} />
+        <QuickActionButton label="Presupuesto" icon={Target} tone="dark" onClick={() => navigate('/budget')} />
       </section>
-
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard title="Ingresos del mes" value={formatCurrency(summary.total_income)} icon={TrendingUp} tone="green" />
         <MetricCard title="Gastos del mes" value={formatCurrency(summary.total_expense)} icon={TrendingDown} tone="red" />
-        <MetricCard title="Ahorro real" value={formatCurrency(summary.saving_amount)} icon={Wallet} tone={summary.saving_amount >= 0 ? 'green' : 'red'} />
-        <MetricCard title="Presupuesto usado" value={`${budgetUsed.toFixed(0)}%`} icon={PieChart} tone={budgetUsed > 90 ? 'orange' : 'blue'} />
+        <MetricCard title="Balance mensual" value={formatCurrency(summary.balance)} icon={Wallet} tone={summary.balance >= 0 ? 'green' : 'red'} />
+        <MetricCard title="Presupuesto usado" value={`${budgetUsed.toFixed(0)}%`} icon={PieChart} tone={budgetUsed >= 80 ? 'orange' : 'blue'} />
       </section>
-
       <section className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-1">
-          <h2 className="mb-2 text-lg font-bold text-text">Ingresos vs gastos</h2>
-          <IncomeExpenseChart income={summary.total_income} expense={summary.total_expense} />
-        </div>
-        <div className="lg:col-span-1">
-          <h2 className="mb-2 text-lg font-bold text-text">Gastos por categoria</h2>
-          <ExpenseCategoryChart data={summary.category_expenses} />
-        </div>
-        <div className="lg:col-span-1">
-          <h2 className="mb-2 text-lg font-bold text-text">Evolucion mensual</h2>
-          <MonthlyTrendChart data={trends.data || []} />
-        </div>
+        <div><h2 className="mb-2 text-lg font-bold">Ingresos vs gastos</h2><Suspense fallback={<ChartFallback />}><IncomeExpenseChart income={summary.total_income} expense={summary.total_expense} /></Suspense></div>
+        <div><h2 className="mb-2 text-lg font-bold">Gastos por categoria</h2><Suspense fallback={<ChartFallback />}><ExpenseCategoryChart data={summary.category_expenses} /></Suspense></div>
+        <div><h2 className="mb-2 text-lg font-bold">Evolucion mensual</h2><Suspense fallback={<ChartFallback />}><MonthlyTrendChart data={data.trends} /></Suspense></div>
       </section>
-
       <section className="grid gap-4 lg:grid-cols-2">
-        <div>
-          <h2 className="mb-2 text-lg font-bold text-text">Ultimos movimientos</h2>
-          <div className="space-y-2">
-            {latest.length ? latest.map((item) => <MovementItem key={item.id} movement={item} onClick={() => openMovement(item.id)} />) : <EmptyState onAction={() => setPage('add')} actionLabel="Agregar movimiento" />}
-          </div>
-        </div>
-        <div>
-          <h2 className="mb-2 text-lg font-bold text-text">Recomendacion principal</h2>
-          {data.recommendations[0] ? <RecommendationCard recommendation={data.recommendations[0]} /> : <EmptyState title="Sin recomendacion" message="Registra movimientos para generar recomendaciones con numeros reales." />}
-        </div>
+        <div><h2 className="mb-2 text-lg font-bold">Ultimos movimientos</h2><div className="space-y-2">{data.latestMovements.length ? data.latestMovements.map((item) => <MovementItem key={item.id} movement={item} onClick={() => navigate(`/movements/${item.id}`)} />) : <EmptyState onAction={() => navigate('/add')} actionLabel="Agregar movimiento" />}</div></div>
+        <div><h2 className="mb-2 text-lg font-bold">Recomendacion principal</h2>{data.recommendations[0] ? <RecommendationCard recommendation={data.recommendations[0]} /> : <EmptyState title="Sin recomendacion" message="Registra movimientos para recibir recomendaciones." />}</div>
       </section>
     </div>
   );

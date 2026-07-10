@@ -1,0 +1,16 @@
+{
+  "versionName": "1.3.1",
+  "versionCode": 131,
+  "minimumSupportedVersionCode": 120,
+  "publishedAt": "2026-07-10T12:18:17Z",
+  "apkUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/download/v1.3.1/control-financiero-ruben-v1.3.1.apk",
+  "sha256": "fdb596ec95f7e709e5b70ea3ef45d9e5a1ec1bac4f48936b97ae2debd6986801",
+  "fileSizeBytes": 4998710,
+  "mandatory": false,
+  "releasePageUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/tag/v1.3.1",
+  "releaseNotes": [
+    "Recupera automaticamente los datos del esquema anterior sin borrarlos.",
+    "Funciona mientras Firestore termina de construir los indices.",
+    "Mantiene cuentas, movimientos y saldos por UID."
+  ]
+}

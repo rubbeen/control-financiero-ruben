@@ -1,61 +1,52 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { deleteDoc, getDoc, getDocs, limit, query, runTransaction, where } from 'firebase/firestore';
 import { Budget } from '../types/finance';
 import { db, nowISO } from './firebase';
-import { nextNumericId } from './firestoreHelpers';
-import { DEFAULT_ACCOUNT_ID, getActiveAccountId } from './accounts';
+import { getAuthenticatedUid, nextTransactionalId, userCollection, userDocument } from './firestoreHelpers';
 
-const COLLECTION = 'budgets';
+const budgetDocumentId = (accountId: number, year: number, month: number) => `${accountId}-${year}-${month}`;
+
+function normalize(data: Partial<Budget>, accountId: number): Omit<Budget, 'id' | 'created_at' | 'updated_at'> {
+  return {
+    account_id: accountId,
+    year: Number(data.year),
+    month: Number(data.month),
+    total_budget: Math.max(0, Math.round(Number(data.total_budget || 0))),
+    saving_goal: Math.max(0, Math.round(Number(data.saving_goal || 0))),
+    unnecessary_expense_limit: Math.max(0, Math.round(Number(data.unnecessary_expense_limit || 0))),
+    category_budgets: (data.category_budgets || []).slice(0, 10).map((item) => ({ category_id: Number(item.category_id), amount_limit: Math.max(0, Math.round(Number(item.amount_limit || 0))) }))
+  };
+}
 
 export const budgetsService = {
-  async list(): Promise<Budget[]> {
-    const snapshot = await getDocs(collection(db, COLLECTION));
-    const activeAccountId = getActiveAccountId();
-    return snapshot.docs
-      .map((item) => item.data() as Budget)
-      .filter((item) => (item.account_id || DEFAULT_ACCOUNT_ID) === activeAccountId)
-      .sort((a, b) => b.year - a.year || b.month - a.month);
+  async list(accountId: number, uid = getAuthenticatedUid()): Promise<Budget[]> {
+    const snapshot = await getDocs(query(userCollection('budgets', uid), where('account_id', '==', accountId), limit(120)));
+    return snapshot.docs.map((item) => item.data() as Budget).sort((a, b) => b.year - a.year || b.month - a.month);
   },
 
-  async get(year: number, month: number): Promise<Budget> {
-    const activeAccountId = getActiveAccountId();
-    const snapshot = await getDocs(query(collection(db, COLLECTION), where('year', '==', year), where('month', '==', month)));
-    const budget = snapshot.docs
-      .map((item) => item.data() as Budget)
-      .find((item) => (item.account_id || DEFAULT_ACCOUNT_ID) === activeAccountId);
-    if (!budget) throw new Error('No se ha definido presupuesto para este mes.');
-    return budget;
+  async get(accountId: number, year: number, month: number, uid = getAuthenticatedUid()): Promise<Budget | null> {
+    const direct = await getDoc(userDocument('budgets', budgetDocumentId(accountId, year, month), uid));
+    return direct.exists() ? direct.data() as Budget : null;
   },
 
-  async create(data: Partial<Budget>): Promise<Budget> {
-    const activeAccountId = getActiveAccountId();
-    const existing = await getDocs(query(collection(db, COLLECTION), where('year', '==', Number(data.year)), where('month', '==', Number(data.month))));
-    const duplicate = existing.docs.map((item) => item.data() as Budget).some((item) => (item.account_id || DEFAULT_ACCOUNT_ID) === activeAccountId);
-    if (duplicate) throw new Error('Ya existe presupuesto para este mes en esta cuenta.');
+  async save(accountId: number, data: Partial<Budget>, uid = getAuthenticatedUid()): Promise<Budget> {
+    const normalized = normalize(data, accountId);
+    const ref = userDocument('budgets', budgetDocumentId(accountId, normalized.year, normalized.month), uid);
     const now = nowISO();
-    const budget: Budget = {
-      id: await nextNumericId(COLLECTION),
-      account_id: activeAccountId,
-      year: Number(data.year),
-      month: Number(data.month),
-      total_budget: Number(data.total_budget || 0),
-      saving_goal: Number(data.saving_goal || 0),
-      unnecessary_expense_limit: Number(data.unnecessary_expense_limit || 0),
-      category_budgets: data.category_budgets || [],
-      created_at: now,
-      updated_at: now
-    };
-    await setDoc(doc(db, COLLECTION, String(budget.id)), budget);
-    return budget;
+    return runTransaction(db, async (transaction) => {
+      const existing = await transaction.get(ref);
+      const id = existing.exists() ? Number(existing.data().id) : await nextTransactionalId(transaction, uid, 'budgetId');
+      const budget: Budget = {
+        ...normalized,
+        id,
+        created_at: existing.exists() ? String(existing.data().created_at) : now,
+        updated_at: now
+      };
+      transaction.set(ref, budget);
+      return budget;
+    });
   },
 
-  async update(id: number, data: Partial<Budget>): Promise<Budget> {
-    await updateDoc(doc(db, COLLECTION, String(id)), { ...data, updated_at: nowISO() });
-    const snapshot = await getDoc(doc(db, COLLECTION, String(id)));
-    return snapshot.data() as Budget;
-  },
-
-  async remove(id: number): Promise<{ message: string }> {
-    await deleteDoc(doc(db, COLLECTION, String(id)));
-    return { message: 'Presupuesto eliminado correctamente.' };
+  async remove(accountId: number, year: number, month: number, uid = getAuthenticatedUid()) {
+    await deleteDoc(userDocument('budgets', budgetDocumentId(accountId, year, month), uid));
   }
 };
