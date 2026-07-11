@@ -84,8 +84,8 @@
 - Causa raiz confirmada: el patron de exclusion `tests/e2e/**` del script no excluyo de forma fiable las pruebas E2E en Linux.
 - Intentos fallidos: confiar en el mismo glob que habia funcionado en Windows.
 - Por que fallaron: el filtrado de rutas no fue equivalente entre los dos entornos.
-- Solucion que funciono: pasar `src` como filtro explicito a Vitest mediante `npm run test -- src`; las pruebas Playwright permanecen en su paso independiente.
-- Archivos modificados: `.github/workflows/android-release.yml` y esta memoria.
+- Solucion que funciono: usar el patron explicito `tests/e2e/**/*.spec.ts` en el script de Vitest; las pruebas Playwright permanecen en su paso independiente.
+- Archivos modificados: `frontend/package.json`, `.github/workflows/android-release.yml` y esta memoria.
 - Pruebas que validan la solucion: 21 pruebas unitarias ejecutadas localmente y workflow Android completado en GitHub Actions.
 - Como detectar una regresion: errores `Playwright Test did not expect test() to be called here` durante el paso de Vitest.
-- Que no volver a hacer: no depender solo de un glob recursivo ambiguo para separar Vitest y Playwright en CI.
+- Que no volver a hacer: no usar `tests/e2e/**` ni un argumento posicional `src` para separar Vitest y Playwright en CI.
