@@ -31,3 +31,11 @@
 - Alternativas descartadas: publicar debug o sustituir silenciosamente el certificado instalado.
 - Consecuencias: el boton de actualizar sigue ofreciendo la ultima version publica valida.
 - Condiciones para reconsiderarla: disponer de una clave release autorizada y un plan explicito de transicion desde la instalacion debug.
+
+## TD-005: firma release permanente desde v1.3.2
+
+- Decision: usar una sola identidad release RSA permanente fuera de Git y reconstruirla temporalmente en CI desde secrets.
+- Motivo: las futuras actualizaciones requieren conservar el certificado de v1.3.2.
+- Alternativas descartadas: reutilizar debug, crear una clave por release o guardar la clave en el repositorio.
+- Consecuencias: la migracion desde v1.3.1 debug es manual; `update-manifest.json` permanece en v1.3.1 hasta una version posterior compatible.
+- Condiciones para reconsiderarla: ninguna salvo una migracion de firma planificada y aprobada para todos los usuarios.

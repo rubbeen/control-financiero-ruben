@@ -10,6 +10,8 @@ frontend/android/build/
 frontend/android/app/build/
 frontend/android/local.properties
 frontend/android/keystore.properties
+**/keystore.properties
+**/key.properties
 frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
@@ -39,6 +41,7 @@ key.properties
 *.sqlite
 *.sqlite3
 release-output/
+frontend/release-artifact/
 local-release/
 test-results/
 playwright-report/

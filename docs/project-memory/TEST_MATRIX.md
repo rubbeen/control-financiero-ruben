@@ -19,4 +19,6 @@
 | Build web | Produccion y lazy chunks | N/A | Configuracion local ignorada | Pasa | 2026-07-10 | `npm run build` |
 | Android | Lint | N/A | Build sin datos personales | Pasa, 0 errores y 17 advertencias | 2026-07-10 | `gradlew.bat lint` |
 | Android | Tests y APK debug local | N/A | Build sin datos personales | Pasa | 2026-07-10 | `gradlew.bat test assembleDebug` |
+| Android release | Firma, package ID, version y huella | Local | APK firmada | Pasa | 2026-07-11 | `gradlew.bat assembleRelease` y `apksigner verify` |
+| Android release | Firma, package ID, version y huella | CI manual | APK firmada | Pendiente merge | 2026-07-11 | `android-release.yml` |
 | Dispositivo | Samsung Galaxy A33 fisico | 1080 x 2400 | Datos sinteticos | Pendiente | 2026-07-10 | Prueba manual |

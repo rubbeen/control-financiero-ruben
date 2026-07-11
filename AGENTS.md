@@ -8,4 +8,5 @@ Lee `docs/project-memory/KNOWN_ISSUES_AND_FIXES.md` y `TECHNICAL_DECISIONS.md` a
 - Seguridad: nunca publiques secretos, correos personales, UID, datos financieros, rutas locales, keystores, APK, respaldos ni archivos `.env` reales. Usa datos sinteticos y Firebase Emulator.
 - Versionado: sincroniza `package.json`, `APP_VERSION`, `versionName` y `versionCode`; no cambies `applicationId`.
 - Publicacion: PR y validaciones primero. Publica Release y manifiesto solo con APK release firmada, compatible y verificada; nunca presentes una APK debug como release segura.
+- Firma Android: reutiliza siempre la identidad release permanente documentada en `docs/android-signing.md`; el keystore y sus credenciales permanecen fuera de Git y la huella se valida en CI.
 - Firebase: no despliegues reglas ni migres produccion desde una tarea de interfaz sin autorizacion separada.
