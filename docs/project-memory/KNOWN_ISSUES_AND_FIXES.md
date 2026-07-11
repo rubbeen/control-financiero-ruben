@@ -74,3 +74,18 @@
 - Pruebas que validan la solucion: `assembleRelease` finalizo y `apksigner` valido la APK.
 - Como detectar una regresion: fallo `validateSigningRelease` al iniciar una compilacion release.
 - Que no volver a hacer: no usar barras invertidas en `storeFile` dentro de propiedades Java.
+
+## RELEASE-004
+
+- Identificador: RELEASE-004.
+- Fecha: 2026-07-11.
+- Sintoma: GitHub Actions intento ejecutar las pruebas Playwright con Vitest y detuvo la compilacion release.
+- Contexto donde aparecio: paso `npm run test` del workflow Android en Ubuntu.
+- Causa raiz confirmada: el patron de exclusion `tests/e2e/**` del script no excluyo de forma fiable las pruebas E2E en Linux.
+- Intentos fallidos: confiar en el mismo glob que habia funcionado en Windows.
+- Por que fallaron: el filtrado de rutas no fue equivalente entre los dos entornos.
+- Solucion que funciono: pasar `src` como filtro explicito a Vitest mediante `npm run test -- src`; las pruebas Playwright permanecen en su paso independiente.
+- Archivos modificados: `.github/workflows/android-release.yml` y esta memoria.
+- Pruebas que validan la solucion: 21 pruebas unitarias ejecutadas localmente y workflow Android completado en GitHub Actions.
+- Como detectar una regresion: errores `Playwright Test did not expect test() to be called here` durante el paso de Vitest.
+- Que no volver a hacer: no depender solo de un glob recursivo ambiguo para separar Vitest y Playwright en CI.
