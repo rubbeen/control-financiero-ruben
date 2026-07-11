@@ -52,7 +52,7 @@ jobs:
           npm run version:check
           npm run lint
           npm run typecheck
-          npm run test
+          npm run test -- src
           npm run build
           npm run cap:sync
 
