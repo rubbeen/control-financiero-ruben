@@ -44,3 +44,33 @@
 - Pruebas que validan la solucion: `apksigner verify --print-certs`, `version:check` y ausencia de cambios en `update-manifest.json`.
 - Como detectar una regresion: una Release nueva cuyo certificado indique Android Debug o un manifiesto que apunte a un APK no verificado.
 - Que no volver a hacer: no publicar APK debug como release segura ni crear un keystore nuevo sin autorizacion.
+
+## RELEASE-002
+
+- Identificador: RELEASE-002.
+- Fecha: 2026-07-11.
+- Sintoma: v1.3.1 debug no puede actualizar directamente a una APK release.
+- Contexto donde aparecio: primera publicacion release permanente de v1.3.2.
+- Causa raiz confirmada: Android exige el mismo certificado para actualizar una instalacion existente.
+- Intentos fallidos: tratar la firma debug como identidad publicable o cambiar de certificado en cada release.
+- Por que fallaron: las APK resultantes no son una ruta de actualizacion segura ni estable.
+- Solucion que funciono: identidad release local permanente, secretos de CI y validacion de huella publica en el workflow manual.
+- Archivos modificados: workflow de release, guia de firma, guia de migracion y documentacion de memoria.
+- Pruebas que validan la solucion: `assembleRelease`, `apksigner verify` y verificacion de `applicationId`, version y huella.
+- Como detectar una regresion: firma Android Debug, huella distinta, APK debuggable o manifiesto actualizado antes de una ruta compatible.
+- Que no volver a hacer: no publicar debug, claves temporales, keystores ni manifests de actualizacion incompatibles.
+
+## RELEASE-003
+
+- Identificador: RELEASE-003.
+- Fecha: 2026-07-11.
+- Sintoma: Gradle no encontro un keystore local con una ruta absoluta de Windows.
+- Contexto donde aparecio: primera compilacion local `assembleRelease`.
+- Causa raiz confirmada: las barras invertidas de la ruta se interpretaron como escapes al leer el archivo de propiedades Java.
+- Intentos fallidos: almacenar la ruta absoluta de Windows con barras invertidas.
+- Por que fallaron: Gradle recibio una ruta relativa malformada.
+- Solucion que funciono: guardar la ruta local con barras normales; CI usa una ruta temporal de Linux.
+- Archivos modificados: propiedades locales ignoradas y esta memoria; no se modifico el build de produccion.
+- Pruebas que validan la solucion: `assembleRelease` finalizo y `apksigner` valido la APK.
+- Como detectar una regresion: fallo `validateSigningRelease` al iniciar una compilacion release.
+- Que no volver a hacer: no usar barras invertidas en `storeFile` dentro de propiedades Java.

@@ -17,5 +17,13 @@
 - [x] Frontend, Emulator, responsive, build, Capacitor y Android validados.
 - [x] Version 1.3.2 (132) sincronizada sin cambiar `applicationId`.
 - [x] Codigo preparado para push y PR sin datos personales.
-- [ ] GitHub Release bloqueada: APK anterior y nueva usan Android Debug y no existe clave release configurada.
-- [ ] `update-manifest.json` se conserva sin cambios hasta disponer de una APK release segura y compatible.
+- [x] APK debug previa identificada y migracion manual requerida para la primera APK release.
+- [x] `update-manifest.json` se conserva en v1.3.1 hasta una version posterior compatible con la firma release.
+
+## Firma release v1.3.2
+
+- [x] Identidad release permanente creada fuera de Git y huella publica documentada.
+- [x] Workflow manual valida version, package ID, no-debug, firma y artifact permitido.
+- [x] Migracion manual desde v1.3.1 debug documentada.
+- [x] `update-manifest.json` permanece en v1.3.1 por incompatibilidad de certificados.
+- [ ] Crear Release solo despues de completar y verificar el workflow desde `main`.
