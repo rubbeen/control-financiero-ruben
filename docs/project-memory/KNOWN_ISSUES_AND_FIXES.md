@@ -104,3 +104,18 @@
 - Pruebas que validan la solucion: workflow Android completo en GitHub Actions.
 - Como detectar una regresion: el log falla inmediatamente al invocar `./gradlew` con codigo 126.
 - Que no volver a hacer: no depender de permisos locales de Windows para scripts ejecutados en Linux.
+
+## RELEASE-006
+
+- Identificador: RELEASE-006.
+- Fecha: 2026-07-11.
+- Sintoma: `assembleRelease` termino correctamente, pero la comprobacion posterior salio con codigo 1 sin identificar la condicion.
+- Contexto donde aparecio: validacion de paquete, version, modo debug y certificado en GitHub Actions.
+- Causa raiz confirmada: verificaciones silenciosas con `grep` y `test` no aportaban diagnostico y dependian de una extraccion rigida.
+- Intentos fallidos: validar todos los metadatos mediante comandos silenciosos bajo `set -e`.
+- Por que fallaron: cualquier diferencia terminaba el paso sin exponer el valor publico comparado.
+- Solucion que funciono: validaciones explicitas, metadatos publicos en el log y huella normalizada antes de comparar.
+- Archivos modificados: `.github/workflows/android-release.yml` y esta memoria.
+- Pruebas que validan la solucion: workflow Android completo, APK no depurable y certificado esperado.
+- Como detectar una regresion: error explicito de paquete, version, modo depurable o certificado en el log.
+- Que no volver a hacer: no ocultar el dato publico que explica una validacion fallida de release.
