@@ -89,3 +89,18 @@
 - Pruebas que validan la solucion: 21 pruebas unitarias ejecutadas localmente y workflow Android completado en GitHub Actions.
 - Como detectar una regresion: errores `Playwright Test did not expect test() to be called here` durante el paso de Vitest.
 - Que no volver a hacer: no usar `tests/e2e/**` ni un argumento posicional `src` para separar Vitest y Playwright en CI.
+
+## RELEASE-005
+
+- Identificador: RELEASE-005.
+- Fecha: 2026-07-11.
+- Sintoma: GitHub Actions detuvo la compilacion Android con `./gradlew: Permission denied`.
+- Contexto donde aparecio: primer `assembleRelease` ejecutado en el runner Ubuntu.
+- Causa raiz confirmada: `frontend/android/gradlew` estaba versionado con modo `100644`, sin permiso de ejecucion.
+- Intentos fallidos: ejecutar el wrapper directamente sin corregir su modo en Git.
+- Por que fallaron: Linux respeta el bit ejecutable del archivo versionado.
+- Solucion que funciono: registrar `frontend/android/gradlew` con modo `100755`.
+- Archivos modificados: `frontend/android/gradlew` y esta memoria.
+- Pruebas que validan la solucion: workflow Android completo en GitHub Actions.
+- Como detectar una regresion: el log falla inmediatamente al invocar `./gradlew` con codigo 126.
+- Que no volver a hacer: no depender de permisos locales de Windows para scripts ejecutados en Linux.
