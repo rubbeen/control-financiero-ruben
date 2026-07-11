@@ -83,10 +83,22 @@ jobs:
           apk="android/app/build/outputs/apk/release/app-release.apk"
           "$build_tools/apksigner" verify --verbose --print-certs "$apk" > "$signing_dir/verification.txt"
           "$build_tools/aapt" dump badging "$apk" > "$signing_dir/badging.txt"
-          grep -q "package: name='com.ruben.controlfinanciero' versionCode='132' versionName='1.3.2'" "$signing_dir/badging.txt"
-          ! grep -q 'application-debuggable' "$signing_dir/badging.txt"
-          actual_cert="$(awk -F ': ' '/Signer #1 certificate SHA-256 digest/ { print $2 }' "$signing_dir/verification.txt" | tr '[:lower:]' '[:upper:]')"
-          test "$actual_cert" = "$EXPECTED_CERT_SHA256"
+            package_line="$(head -n 1 "$signing_dir/badging.txt")"
+            printf 'APK package metadata: %s\n' "$package_line"
+            case "$package_line" in
+              *"name='com.ruben.controlfinanciero'"*"versionCode='132'"*"versionName='1.3.2'"*) ;;
+              *) echo '::error::Unexpected APK package or version metadata'; exit 1 ;;
+            esac
+            if grep -q 'application-debuggable' "$signing_dir/badging.txt"; then
+              echo '::error::Release APK is debuggable'
+              exit 1
+            fi
+            actual_cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$signing_dir/verification.txt" | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]')"
+            printf 'APK signing certificate SHA-256: %s\n' "$actual_cert"
+            if [ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]; then
+              echo '::error::Unexpected APK signing certificate'
+              exit 1
+            fi
           artifact_dir="release-artifact"
           mkdir -p "$artifact_dir"
           artifact_apk="$artifact_dir/control-financiero-ruben-v1.3.2.apk"
