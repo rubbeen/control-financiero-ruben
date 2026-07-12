@@ -119,3 +119,18 @@
 - Pruebas que validan la solucion: workflow Android completo, APK no depurable y certificado esperado.
 - Como detectar una regresion: error explicito de paquete, version, modo depurable o certificado en el log.
 - Que no volver a hacer: no ocultar el dato publico que explica una validacion fallida de release.
+
+## RELEASE-007
+
+- Identificador: RELEASE-007.
+- Fecha: 2026-07-11.
+- Sintoma: `apksigner` valido la APK en CI, pero la extraccion textual de su huella produjo una cadena vacia.
+- Contexto donde aparecio: comprobacion del certificado posterior a `assembleRelease` en Ubuntu.
+- Causa raiz confirmada: el parser dependia del texto exacto emitido por la version de `apksigner` instalada en el runner.
+- Intentos fallidos: extraer la huella con `awk` y despues con `sed` desde la salida humana de `apksigner`.
+- Por que fallaron: ambas soluciones dependian de la misma etiqueta de salida no estable.
+- Solucion que funciono: exportar el certificado PEM con `keytool` y calcular SHA-256 con OpenSSL.
+- Archivos modificados: `.github/workflows/android-release.yml` y esta memoria.
+- Pruebas que validan la solucion: workflow Android completo y huella publica igual a `EXPECTED_CERT_SHA256`.
+- Como detectar una regresion: huella vacia o error explicito `Unexpected APK signing certificate`.
+- Que no volver a hacer: no parsear texto humano de `apksigner` para obtener la identidad criptografica.
