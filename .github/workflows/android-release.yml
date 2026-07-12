@@ -93,7 +93,8 @@ jobs:
               echo '::error::Release APK is debuggable'
               exit 1
             fi
-            actual_cert="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$signing_dir/verification.txt" | tr '[:lower:]' '[:upper:]' | tr -d '[:space:]')"
+            keytool -printcert -jarfile "$apk" -rfc > "$signing_dir/certificate.pem"
+            actual_cert="$(openssl x509 -in "$signing_dir/certificate.pem" -noout -fingerprint -sha256 | cut -d= -f2 | tr '[:lower:]' '[:upper:]' | tr -d ':[:space:]')"
             printf 'APK signing certificate SHA-256: %s\n' "$actual_cert"
             if [ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]; then
               echo '::error::Unexpected APK signing certificate'
