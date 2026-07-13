@@ -2,6 +2,15 @@
 
 | Area | Prueba | Viewport | Datos de prueba | Resultado | Fecha | Comando |
 | --- | --- | --- | --- | --- | --- | --- |
+| Orientacion | Dashboard montado vertical, horizontal y vertical | 360 x 800, 412 x 915, 393 x 873 | Datos sinteticos y callback WebView omitido | Pasa, 3 secuencias | 2026-07-13 | `playwright test tests/e2e/orientation-regression.spec.ts` |
+| Orientacion | Cinco ciclos sin recarga, overflow ni consultas | 360 x 800 a 800 x 360 | Datos sinteticos | Pasa | 2026-07-13 | `playwright test tests/e2e/orientation-regression.spec.ts` |
+| Frontend v1.3.5 | Lint, TypeScript y servicios/componentes | jsdom | Fixtures sinteticos | Pasa, 35 unitarias | 2026-07-13 | `npm run lint` / `npm run typecheck` / `npm run test` |
+| Seguridad v1.3.5 | Reglas UID y correo verificado | Emulator | Identidades ficticias | Pasa, 17 | 2026-07-13 | `npm run test:rules` |
+| Navegacion v1.3.5 | Suite E2E completa con rotacion | 320 a 1366 px | Datos sinteticos | Pasa, 20; 2 condicionales omitidas | 2026-07-13 | `npm run test:e2e` |
+| Builds web v1.3.5 | Variantes GitHub y Play | N/A | Configuracion local ignorada | Pasa | 2026-07-13 | `npm run build:github` / `npm run build:play` |
+| Android GitHub v1.3.5 | Lint, tests, APK, paquete, version y firma | API 35 | Release 1.3.5 (135) | Pasa | 2026-07-13 | `lintGithubRelease testGithubReleaseUnitTest assembleGithubRelease` |
+| Android Play v1.3.5 | Lint, tests, AAB y firma | API 35 | Release 1.3.5 (135) | Pasa; 0 `.so` | 2026-07-13 | `lintPlayRelease testPlayReleaseUnitTest bundlePlayRelease` |
+| Dispositivo v1.3.5 | Rotacion fisica | Android | N/A | No ejecutada; sin dispositivo ni emulador conectado | 2026-07-13 | `adb devices -l` |
 | Acceso | Registro, verificacion y primer ingreso | 320 x 568 y 740 x 360 | Usuario sintetico | Pasa | 2026-07-13 | `playwright test tests/e2e/registration.spec.ts` |
 | Responsive | Todas las rutas, vertical y horizontal | 320 x 568 a 915 x 412 | Datos sinteticos | Pasa, 13 pruebas | 2026-07-13 | `playwright test tests/e2e/responsive.spec.ts` |
 | Frontend | Servicios y componentes | jsdom | Fixtures sinteticos | Pasa, 34 pruebas | 2026-07-13 | `npm run test` |

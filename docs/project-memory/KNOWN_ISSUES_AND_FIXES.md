@@ -1,5 +1,19 @@
 # Problemas conocidos y soluciones
 
+## UI-003
+
+- Identificador: UI-003.
+- Fecha: 2026-07-13.
+- Version afectada: 1.3.4 (134), especialmente Android WebView durante una rotacion con el Dashboard montado.
+- Sintoma: al volver de horizontal a vertical, las graficas podian conservar coordenadas horizontales y dejar el contenido visual comprimido o desplazado.
+- Reproduccion: abrir Dashboard en vertical, desplazarse a las graficas, girar a horizontal, seguir desplazandose y volver a vertical sin recargar ni cambiar de ruta.
+- Causa raiz confirmada: `ResponsiveContainer` dependia exclusivamente de su `ResizeObserver`; cuando Android WebView omitia la segunda entrega, el host recuperaba 335 px pero los tres SVG y sus `viewBox` conservaban 815 px.
+- Solucion que funciono: un unico epoch de geometria para la seccion de graficas escucha `resize`, `orientationchange` y `visualViewport.resize`, espera dos frames, deduplica medidas y remonta solo cada `ResponsiveContainer`.
+- Tratamiento adicional: `minWidth` y `minHeight` en cero, recorte limitado al marco de cada grafica, tooltip reiniciado y animacion de entrada desactivada para mostrar los datos inmediatamente tras rotar.
+- Prueba dinamica: `orientation-regression.spec.ts` cubre 360 x 800, 412 x 915, 393 x 873 y cinco ciclos, manteniendo la misma pagina e inyectando la omision del segundo callback observada en WebView.
+- Medicion posterior: al volver a 393 x 873, Dashboard 361 px, host 335 px, SVG 335 px, `scrollX` 0 y `scrollWidth` 393 px.
+- Que no volver a hacer: una prueba responsive estatica no sustituye una prueba de orientacion dinamica. Toda pantalla con Recharts debe probar vertical, horizontal y vertical sin recarga.
+
 ## AUTH-001
 
 - Identificador: AUTH-001.

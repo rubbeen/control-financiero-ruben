@@ -11,7 +11,7 @@ interface Props {
 export default function BalanceCard({ currentBalance, monthlyBalance, income, expense }: Props) {
   const positive = monthlyBalance >= 0;
   return (
-    <section className="rounded-lg bg-gradient-to-br from-cocoa via-copper to-purchase p-5 text-white shadow-soft">
+    <section data-testid="balance-card" className="rounded-lg bg-gradient-to-br from-cocoa via-copper to-purchase p-5 text-white shadow-soft">
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-amber-100">Saldo actual</p>

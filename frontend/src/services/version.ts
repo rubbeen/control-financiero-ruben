@@ -3,8 +3,8 @@ import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { perfMeasureAsync } from '../utils/performance';
 
-export const APP_VERSION = '1.3.4';
-export const APP_VERSION_CODE = 134;
+export const APP_VERSION = '1.3.5';
+export const APP_VERSION_CODE = 135;
 export const RELEASE_PAGE_URL = 'https://github.com/rubbeen/control-financiero-ruben/releases';
 export const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/rubbeen/control-financiero-ruben/main/update-manifest.json';
 
