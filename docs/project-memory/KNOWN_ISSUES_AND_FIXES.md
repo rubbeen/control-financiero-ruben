@@ -1,5 +1,34 @@
 # Problemas conocidos y soluciones
 
+## SYNC-001
+
+- Sintoma: el Dashboard mostraba un error rojo mientras la consulta financiera seguia deshabilitada porque aun no existia cuenta activa.
+- Causa raiz: `financial.isError || !financial.data` confundia datos aun no solicitados con fallo definitivo.
+- Solucion: combinar estado de cuentas, `isPending`, `fetchStatus`, cache, refetch y politica Firebase; conservar datos durante actualizacion.
+- Prueba de regresion: politica de reintentos unitaria, E2E de carga y Dashboard sin error durante estado pendiente.
+- No repetir: no usar `!data` como unica condicion de error.
+
+## EXPORT-001
+
+- Sintoma: Blob, anchor y `link.click()` no guardaban de forma fiable PDF, CSV o respaldos en Android.
+- Causa raiz: el mecanismo web no confirma persistencia en almacenamiento Android.
+- Solucion: generacion separada, SAF con `ACTION_CREATE_DOCUMENT`, temporales limitados a `cache/exports/`, Share oficial y FileOpener.
+- Prueba de regresion: bytes PDF, MIME/nombre, builds Android y cancelacion sin iniciar importacion.
+- No repetir: anchor download es exclusivamente web; no considerar guardado un Blob temporal.
+
+## PRIVACY-001
+
+- Sintoma: toda release bloqueaba capturas sin eleccion del usuario.
+- Causa raiz: `MainActivity` aplicaba `FLAG_SECURE` de forma incondicional.
+- Solucion: preferencia local `SharedPreferences`, desactivada por defecto, reversible y aplicada al instante.
+- No repetir: conservar `FLAG_SECURE`, pero siempre condicionado a la preferencia local.
+
+## PLAY-001
+
+- Sintoma: un unico paquete mezclaba actualizador externo y futura distribucion Play.
+- Solucion: flavors `github` y `play`, AAB privado, API 35, 16 KB, Fastlane Supply fijado y workflow manual con precondiciones.
+- No repetir: nunca subir a Play una variante que declare `REQUEST_INSTALL_PACKAGES`.
+
 ## UI-001
 
 - Identificador: UI-001.

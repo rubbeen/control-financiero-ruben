@@ -1,4 +1,4 @@
-name: Android release artifact
+name: Android release artifacts
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       version:
         description: Version to build
         required: true
-        default: '1.3.2'
+        default: '1.3.3'
         type: string
 
 permissions:
@@ -16,8 +16,12 @@ jobs:
   build-release:
     runs-on: ubuntu-latest
     env:
-      EXPECTED_VERSION: '1.3.2'
-      EXPECTED_CERT_SHA256: '8457C0879F10049FD9CC2E5BFA5B3B124A023E358BAF0EBFAF4256F53D9E0C4E'
+      EXPECTED_VERSION: '1.3.3'
+      EXPECTED_VERSION_CODE: '133'
+      EXPECTED_APPLICATION_ID: com.ruben.controlfinanciero
+      EXPECTED_CERT_SHA256: 8457C0879F10049FD9CC2E5BFA5B3B124A023E358BAF0EBFAF4256F53D9E0C4E
+      BUNDLETOOL_VERSION: 1.18.3
+      BUNDLETOOL_SHA256: a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29
       VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
       VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
       VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
@@ -44,7 +48,7 @@ jobs:
       - name: Verify requested version
         run: test "${{ inputs.version }}" = "$EXPECTED_VERSION"
 
-      - name: Validate web application
+      - name: Validate application
         working-directory: frontend
         run: |
           set -euo pipefail
@@ -52,11 +56,12 @@ jobs:
           npm run version:check
           npm run lint
           npm run typecheck
-          npm run test -- src
-          npm run build
-          npm run cap:sync
+          npm run test
+          npm run test:rules
+          npx playwright install --with-deps chromium
+          npm run test:e2e
 
-      - name: Build and verify signed release APK
+      - name: Prepare release signing
         working-directory: frontend
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -65,53 +70,93 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          signing_dir="$(mktemp -d)"
-          cleanup() {
-            rm -f android/keystore.properties
-            rm -rf "$signing_dir"
-          }
-          trap cleanup EXIT
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          signing_dir="$RUNNER_TEMP/android-signing"
+          mkdir -p "$signing_dir"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$signing_dir/release.jks"
           chmod 600 "$signing_dir/release.jks"
           printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' "$signing_dir/release.jks" "$ANDROID_KEYSTORE_PASSWORD" "$ANDROID_KEY_ALIAS" "$ANDROID_KEY_PASSWORD" > android/keystore.properties
           chmod 600 android/keystore.properties
+
+      - name: Build and verify GitHub APK
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          npm run cap:sync:github
           cd android
-          ./gradlew lint test assembleRelease --no-daemon
+          ./gradlew lint test assembleGithubRelease --no-daemon
           cd ..
           sdk_root="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           build_tools="$(find "$sdk_root/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
-          apk="android/app/build/outputs/apk/release/app-release.apk"
-          "$build_tools/apksigner" verify --verbose --print-certs "$apk" > "$signing_dir/verification.txt"
-          "$build_tools/aapt" dump badging "$apk" > "$signing_dir/badging.txt"
-            package_line="$(head -n 1 "$signing_dir/badging.txt")"
-            printf 'APK package metadata: %s\n' "$package_line"
-            case "$package_line" in
-              *"name='com.ruben.controlfinanciero'"*"versionCode='132'"*"versionName='1.3.2'"*) ;;
-              *) echo '::error::Unexpected APK package or version metadata'; exit 1 ;;
-            esac
-            if grep -q 'application-debuggable' "$signing_dir/badging.txt"; then
-              echo '::error::Release APK is debuggable'
-              exit 1
-            fi
-            keytool -printcert -jarfile "$apk" -rfc > "$signing_dir/certificate.pem"
-            actual_cert="$(openssl x509 -in "$signing_dir/certificate.pem" -noout -fingerprint -sha256 | cut -d= -f2 | tr '[:lower:]' '[:upper:]' | tr -d ':[:space:]')"
-            printf 'APK signing certificate SHA-256: %s\n' "$actual_cert"
-            if [ "$actual_cert" != "$EXPECTED_CERT_SHA256" ]; then
-              echo '::error::Unexpected APK signing certificate'
-              exit 1
-            fi
-          artifact_dir="release-artifact"
-          mkdir -p "$artifact_dir"
-          artifact_apk="$artifact_dir/control-financiero-ruben-v1.3.2.apk"
-          cp "$apk" "$artifact_apk"
-          sha256sum "$artifact_apk" > "$artifact_dir/SHA256SUMS.txt"
-          printf '%s\n' "$actual_cert" > "$artifact_dir/SIGNING_CERT_SHA256.txt"
+          apk="android/app/build/outputs/apk/github/release/app-github-release.apk"
+          "$build_tools/apksigner" verify --verbose --print-certs "$apk"
+          package_line="$("$build_tools/aapt" dump badging "$apk" | head -n 1)"
+          case "$package_line" in
+            *"name='$EXPECTED_APPLICATION_ID'"*"versionCode='$EXPECTED_VERSION_CODE'"*"versionName='$EXPECTED_VERSION'"*) ;;
+            *) echo '::error::Unexpected APK package or version'; exit 1 ;;
+          esac
+          "$build_tools/aapt" dump permissions "$apk" | grep -q REQUEST_INSTALL_PACKAGES
+          keytool -printcert -jarfile "$apk" -rfc > "$RUNNER_TEMP/apk-certificate.pem"
+          actual_cert="$(openssl x509 -in "$RUNNER_TEMP/apk-certificate.pem" -noout -fingerprint -sha256 | cut -d= -f2 | tr '[:lower:]' '[:upper:]' | tr -d ':[:space:]')"
+          test "$actual_cert" = "$EXPECTED_CERT_SHA256"
+          mkdir -p release-github
+          target="release-github/control-financiero-ruben-v$EXPECTED_VERSION.apk"
+          cp "$apk" "$target"
+          sha256sum "$target" > release-github/SHA256SUMS.txt
+          printf '%s\n' "$actual_cert" > release-github/SIGNING_CERT_SHA256.txt
+          printf 'Control Financiero Ruben v%s\n\n- Inicio sin falso error transitorio.\n- Exportacion Android fiable de PDF, CSV y respaldos.\n- Proteccion de capturas configurable.\n- Preparacion tecnica para Google Play.\n' "$EXPECTED_VERSION" > release-github/release-notes.md
+
+      - name: Build and verify Play AAB
+        working-directory: frontend
+        run: |
+          set -euo pipefail
+          npm run cap:sync:play
+          cd android
+          ./gradlew lintPlayRelease testPlayReleaseUnitTest bundlePlayRelease --no-daemon
+          cd ..
+          aab="android/app/build/outputs/bundle/playRelease/app-play-release.aab"
+          bundletool="$RUNNER_TEMP/bundletool.jar"
+          curl --fail --location --silent --show-error "https://github.com/google/bundletool/releases/download/$BUNDLETOOL_VERSION/bundletool-all-$BUNDLETOOL_VERSION.jar" --output "$bundletool"
+          echo "$BUNDLETOOL_SHA256  $bundletool" | sha256sum --check
+          java -jar "$bundletool" validate --bundle="$aab" > "$RUNNER_TEMP/bundletool-validate.txt"
+          java -jar "$bundletool" dump manifest --bundle="$aab" --module=base > "$RUNNER_TEMP/play-manifest.xml"
+          java -jar "$bundletool" dump config --bundle="$aab" > "$RUNNER_TEMP/bundle-config.txt"
+          grep -q "package=\"$EXPECTED_APPLICATION_ID\"" "$RUNNER_TEMP/play-manifest.xml"
+          grep -q "android:versionCode=\"$EXPECTED_VERSION_CODE\"" "$RUNNER_TEMP/play-manifest.xml"
+          grep -q "android:versionName=\"$EXPECTED_VERSION\"" "$RUNNER_TEMP/play-manifest.xml"
+          ! grep -q REQUEST_INSTALL_PACKAGES "$RUNNER_TEMP/play-manifest.xml"
+          grep -q PAGE_ALIGNMENT_16K "$RUNNER_TEMP/bundle-config.txt"
+          actual_cert="$(keytool -printcert -jarfile "$aab" | awk -F': ' '/SHA256:/{gsub(":", "", $2); print toupper($2); exit}')"
+          test "$actual_cert" = "$EXPECTED_CERT_SHA256"
+          mkdir -p release-play
+          cp "$aab" "release-play/control-financiero-ruben-v$EXPECTED_VERSION-play.aab"
+          cp android/app/build/outputs/mapping/playRelease/mapping.txt release-play/mapping.txt
+          cp "$RUNNER_TEMP/bundletool-validate.txt" "$RUNNER_TEMP/bundle-config.txt" "$RUNNER_TEMP/play-manifest.xml" release-play/
+          sha256sum release-play/*.aab release-play/mapping.txt > release-play/SHA256SUMS.txt
+          printf '%s\n' "$actual_cert" > release-play/SIGNING_CERT_SHA256.txt
+          if unzip -l "$aab" | grep -q '\.so$'; then
+            printf 'Native libraries found; inspect each ABI before Play upload.\n' > release-play/native-libraries.txt
+            exit 1
+          fi
+          printf 'No native .so libraries. Java/Kotlin application; bundle requests PAGE_ALIGNMENT_16K.\n' > release-play/native-libraries.txt
 
       - uses: actions/upload-artifact@v4
         with:
-          name: control-financiero-ruben-v1.3.2-release
+          name: control-financiero-ruben-v1.3.3-github-release
           if-no-files-found: error
-          path: |
-            frontend/release-artifact/control-financiero-ruben-v1.3.2.apk
-            frontend/release-artifact/SHA256SUMS.txt
-            frontend/release-artifact/SIGNING_CERT_SHA256.txt
+          retention-days: 14
+          path: frontend/release-github/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: control-financiero-ruben-v1.3.3-play-candidate
+          if-no-files-found: error
+          retention-days: 14
+          path: frontend/release-play/
+
+      - name: Remove temporary signing files
+        if: always()
+        working-directory: frontend
+        run: |
+          rm -f android/keystore.properties
+          rm -rf "$RUNNER_TEMP/android-signing"

@@ -11,3 +11,6 @@ Lee `docs/project-memory/KNOWN_ISSUES_AND_FIXES.md` y `TECHNICAL_DECISIONS.md` a
 - Firma Android: reutiliza siempre la identidad release permanente documentada en `docs/android-signing.md`; el keystore y sus credenciales permanecen fuera de Git y la huella se valida en CI.
 - Firebase: no despliegues reglas ni migres produccion desde una tarea de interfaz sin autorizacion separada.
 - Paquetes para revision: usa el workflow manual `ChatGPT review package`; nunca compartas carpetas completas con `node_modules`, builds, caches, `.git`, keystores, secrets, respaldos o datos reales. Valida siempre checksum y extraccion antes de entregar el artifact.
+- Exportaciones: `reports.ts` y `backup.ts` solo generan bytes; toda entrega pasa por `fileExport.ts`. Web usa anchor temporal y Android usa SAF o `cache/exports/` para abrir/compartir.
+- Distribucion: compila `cap:sync:github` para APK y `cap:sync:play` para AAB. Play no puede declarar `REQUEST_INSTALL_PACKAGES` ni mostrar instalacion desde GitHub.
+- Play: el siguiente paso operativo es ejecutar `play-publish.yml` en track interno; no publiques produccion sin confirmacion separada.

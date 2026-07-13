@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, runTransaction, Transaction, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, runTransaction, Transaction, writeBatch } from 'firebase/firestore';
 import { Category, FinanceAccount, Movement } from '../types/finance';
 import { movementSignedAmount } from '../utils/calculations';
 import { auth, db, nowISO } from './firebase';
@@ -43,8 +43,13 @@ export async function nextTransactionalIds(transaction: Transaction, uid: string
 
 export async function ensureUserInitialized(uid = getAuthenticatedUid()) {
   if (initialized.has(uid)) return;
-  await migrateLegacyData(uid);
   const initializationRef = doc(db, 'users', uid, 'meta', 'initialization');
+  const currentInitialization = await getDoc(initializationRef);
+  if (Number(currentInitialization.data()?.categoriesSeedVersion || 0) >= 1 && currentInitialization.data()?.defaultAccountCreated) {
+    initialized.add(uid);
+    return;
+  }
+  await migrateLegacyData(uid);
   await runTransaction(db, async (transaction) => {
     const initialization = await transaction.get(initializationRef);
     if (Number(initialization.data()?.categoriesSeedVersion || 0) >= 1 && initialization.data()?.defaultAccountCreated) return;
@@ -103,6 +108,8 @@ function normalizeLegacyMovement(data: Record<string, unknown>, documentId: stri
 async function migrateLegacyData(uid: string) {
   let legacySnapshots;
   try {
+    const probes = await Promise.all(LEGACY_COLLECTIONS.map((name) => getDocs(query(collection(db, name), limit(1)))));
+    if (probes.every((snapshot) => snapshot.empty)) return;
     legacySnapshots = await Promise.all(LEGACY_COLLECTIONS.map((name) => getDocs(collection(db, name))));
   } catch (error) {
     if (isPermissionDenied(error)) return;
@@ -111,7 +118,7 @@ async function migrateLegacyData(uid: string) {
 
   const [legacyAccounts, legacyCategories, legacyMovements, legacyBudgets] = legacySnapshots;
   if (legacySnapshots.every((snapshot) => snapshot.empty)) return;
-  const currentMovements = await getDocs(userCollection('movements', uid));
+  const currentMovements = await getDocs(query(userCollection('movements', uid), limit(1)));
   if (!currentMovements.empty) return;
 
   const now = nowISO();

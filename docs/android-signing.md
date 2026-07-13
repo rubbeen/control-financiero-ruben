@@ -7,6 +7,8 @@
 
 La misma clave debe reutilizarse para todas las versiones posteriores a v1.3.2. Perderla impide publicar actualizaciones compatibles; conserva una copia externa segura del keystore y de las credenciales sin incluirlas en Git.
 
+Para Google Play, esta identidad se importa como app signing key. Despues se crea una upload key separada; sus secretos `ANDROID_UPLOAD_*` nunca sustituyen ni exponen la app signing key. Consulta `docs/play-store/APP_SIGNING_PLAN.md`.
+
 Verificacion del APK:
 
 ```powershell

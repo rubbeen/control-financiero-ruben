@@ -11,7 +11,9 @@ export default function ConnectionStatus() {
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
-    const unsubscribe = queryClient.getQueryCache().subscribe(() => setHasError(queryClient.getQueryCache().getAll().some((query) => query.state.status === 'error')));
+    const refresh = () => setHasError(queryClient.getQueryCache().getAll().some((query) => query.isActive() && query.state.status === 'error' && query.state.data === undefined));
+    const unsubscribe = queryClient.getQueryCache().subscribe(refresh);
+    refresh();
     window.addEventListener('online', update);
     window.addEventListener('offline', update);
     return () => {

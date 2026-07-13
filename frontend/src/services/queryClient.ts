@@ -1,9 +1,11 @@
 import { QueryClient } from '@tanstack/react-query';
+import { firebaseRetryDelay, shouldRetryFirebaseQuery } from './firebaseErrorPolicy';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: shouldRetryFirebaseQuery,
+      retryDelay: firebaseRetryDelay,
       refetchOnWindowFocus: false,
       gcTime: 15 * 60 * 1000
     },

@@ -133,24 +133,33 @@ export const movementsService = {
     }
   },
 
-  async getAllByRange({ uid = getAuthenticatedUid(), accountId, startDate, endDate, maxDocuments = 2000 }: { uid?: string; accountId: number; startDate: string; endDate: string; maxDocuments?: number }): Promise<Movement[]> {
+  async getAllByRange({ uid = getAuthenticatedUid(), accountId, startDate, endDate, maxDocuments = 50_000 }: { uid?: string; accountId: number; startDate: string; endDate: string; maxDocuments?: number }): Promise<Movement[]> {
     await ensureUserInitialized(uid);
     try {
-      const snapshot = await getDocs(query(
-        userCollection('movements', uid),
-        where('account_id', '==', accountId),
-        where('date', '>=', startDate),
-        where('date', '<=', endDate),
-        orderBy('date', 'desc'),
-        orderBy('id', 'desc'),
-        limit(Math.min(maxDocuments, 5000))
-      ));
-      return snapshot.docs.map((item) => item.data() as Movement);
+      const rows: Movement[] = [];
+      let cursor: MovementCursor | null = null;
+      while (rows.length < maxDocuments) {
+        const constraints: QueryConstraint[] = [
+          where('account_id', '==', accountId), where('date', '>=', startDate), where('date', '<=', endDate),
+          orderBy('date', 'desc'), orderBy('id', 'desc')
+        ];
+        if (cursor) constraints.push(startAfter(cursor.date, cursor.id));
+        const pageSize = Math.min(500, maxDocuments - rows.length);
+        constraints.push(limit(pageSize));
+        const snapshot = await getDocs(query(userCollection('movements', uid), ...constraints));
+        const page = snapshot.docs.map((item) => item.data() as Movement);
+        rows.push(...page);
+        if (page.length < pageSize) return rows;
+        cursor = { date: page[page.length - 1].date, id: page[page.length - 1].id };
+      }
+      throw new Error('El periodo supera el limite seguro de analisis. Reduce el rango.');
     } catch (error) {
       if (!missingIndex(error)) throw error;
-      return (await compatibleAccountMovements(uid, accountId, Math.min(maxDocuments, 5000)))
+      const compatible = await compatibleAccountMovements(uid, accountId, Math.min(maxDocuments, 5000));
+      if (compatible.length >= Math.min(maxDocuments, 5000)) throw Object.assign(new Error('Falta un indice de Firestore para analizar el periodo completo.'), { cause: error });
+      return compatible
         .filter((item) => item.date >= startDate && item.date <= endDate)
-        .slice(0, Math.min(maxDocuments, 5000));
+        .slice(0, maxDocuments);
     }
   },
 

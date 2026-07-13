@@ -1,5 +1,25 @@
 # Decisiones tecnicas
 
+## TD-006: estado asincrono y reintentos Firebase
+
+- Decision: reintentar solo errores transitorios hasta tres veces con 500, 1000 y 2000 ms; errores de acceso no se reintentan.
+- Motivo: evita falsos errores y bucles ante reglas o sesiones invalidas.
+
+## TD-007: Storage Access Framework para exportaciones
+
+- Decision: Android guarda con `ACTION_CREATE_DOCUMENT`; compartir usa `@capacitor/share` y solo `cache/exports/`.
+- Motivo: confirma persistencia sin permisos generales de almacenamiento.
+
+## TD-008: dos canales de distribucion
+
+- Decision: flavors `github` y `play` sin duplicar la aplicacion. Solo GitHub declara instalacion externa.
+- Motivo: cumplir Play y conservar actualizaciones directas de GitHub.
+
+## TD-009: Fastlane Supply fijado
+
+- Decision: `play-publish.yml` usa Fastlane 2.228.0 mediante Gemfile.
+- Motivo: herramienta mantenida, versionada y con soporte directo para tracks y estados de release; evita una accion opaca de publicacion.
+
 ## TD-001: grid adaptable para movimientos
 
 - Decision: usar `44px minmax(0, 1fr)` en movil y agregar `max-content` para el importe desde `sm`.

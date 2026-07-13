@@ -1,5 +1,15 @@
 # Lista de release
 
+## Estado v1.3.3
+
+- [x] Version 1.3.3 (133), package y API 35 sincronizados.
+- [x] APK GitHub firmada y con permiso de instalacion externa aislado.
+- [x] AAB Play firmada, sin permiso de instalacion externa, sin `.so` y con `PAGE_ALIGNMENT_16K`.
+- [x] PDF, CSV y respaldo usan entrega nativa segura.
+- [x] Capturas permitidas por defecto y proteccion local reversible.
+- [ ] Completar prerrequisitos externos de Play Console.
+- [ ] Ejecutar Release CI desde `main`, publicar GitHub Release y actualizar manifiesto tras verificar la APK.
+
 - [ ] Ejecutar `npm ci`, lint, typecheck, unitarias, reglas, E2E, build, `cap:sync` y `version:check`.
 - [ ] Ejecutar Android lint, tests y build desde la rama principal integrada.
 - [ ] Revisar `git diff --check`, archivos staged y escaneo de secretos redactado.

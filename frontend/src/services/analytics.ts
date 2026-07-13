@@ -165,7 +165,7 @@ export function calculateFinancialAnalysis({ dataset, year, month, trendMonths }
     currentBalance: dataset.currentBalance,
     trends,
     latestMovements: decorateMovements(dataset.latestMovements, dataset.categories),
-    documentsReadMaximum: 2000 + 20 + dataset.categories.length + 2
+    documentsReadMaximum: dataset.movements.length + 20 + dataset.categories.length + 2
   };
 }
 
