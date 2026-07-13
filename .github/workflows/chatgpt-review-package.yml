@@ -276,52 +276,52 @@ jobs:
               app_id = re.search(r"appId:\s*'([^']+)'", capacitor)
               return f"""# Project summary
 
-- Name: Control Financiero Ruben.
-- Repository: rubbeen/control-financiero-ruben.
-- Version: {package.get("version")}.
-- Android versionName: {version_name.group(1) if version_name else "unknown"}.
-- Android versionCode: {version_code.group(1) if version_code else "unknown"}.
-- applicationId: {app_id.group(1) if app_id else "unknown"}.
-- compileSdk: {compile_sdk.group(1) if compile_sdk else "unknown"}.
-- targetSdk: {target_sdk.group(1) if target_sdk else "unknown"}.
-- minSdk: {min_sdk.group(1) if min_sdk else "unknown"}.
+          - Name: Control Financiero Ruben.
+          - Repository: rubbeen/control-financiero-ruben.
+          - Version: {package.get("version")}.
+          - Android versionName: {version_name.group(1) if version_name else "unknown"}.
+          - Android versionCode: {version_code.group(1) if version_code else "unknown"}.
+          - applicationId: {app_id.group(1) if app_id else "unknown"}.
+          - compileSdk: {compile_sdk.group(1) if compile_sdk else "unknown"}.
+          - targetSdk: {target_sdk.group(1) if target_sdk else "unknown"}.
+          - minSdk: {min_sdk.group(1) if min_sdk else "unknown"}.
 
-## Architecture
+          ## Architecture
 
-React, TypeScript, Vite, Tailwind CSS, React Router, TanStack React Query, Firebase Auth, Cloud Firestore and Capacitor Android. The app reads and writes Firestore directly under `users/{{uid}}`; no local Python backend is required for the current architecture.
+          React, TypeScript, Vite, Tailwind CSS, React Router, TanStack React Query, Firebase Auth, Cloud Firestore and Capacitor Android. The app reads and writes Firestore directly under `users/{{uid}}`; no local Python backend is required for the current architecture.
 
-## Firebase and data model
+          ## Firebase and data model
 
-Firebase Auth requires a verified account. Firestore rules isolate data by authenticated UID and validate document fields. Main collections are `accounts`, `categories`, `movements`, `budgets`, plus `meta/counters` and `meta/initialization` under each user document.
+          Firebase Auth requires a verified account. Firestore rules isolate data by authenticated UID and validate document fields. Main collections are `accounts`, `categories`, `movements`, `budgets`, plus `meta/counters` and `meta/initialization` under each user document.
 
-## Functional areas
+          ## Functional areas
 
-Accounts isolate balances and analysis by financial folder. Movements support income, expense, purchase, transfer and adjustment. Transfers create paired movements with a shared transfer group and update source/destination balances transactionally. Budgets are monthly and account-scoped. Reports use PDF generation code in `frontend/src/services/reports.ts`. Backups use encrypted `.cfrbackup` logic in source, but backup files are excluded from this package.
+          Accounts isolate balances and analysis by financial folder. Movements support income, expense, purchase, transfer and adjustment. Transfers create paired movements with a shared transfer group and update source/destination balances transactionally. Budgets are monthly and account-scoped. Reports use PDF generation code in `frontend/src/services/reports.ts`. Backups use encrypted `.cfrbackup` logic in source, but backup files are excluded from this package.
 
-## Runtime and cache
+          ## Runtime and cache
 
-React Query keeps in-memory cache keyed by UID and account. Cache is cleared on logout. Initial data and legacy migration helpers live in `frontend/src/services/firestoreHelpers.ts`.
+          React Query keeps in-memory cache keyed by UID and account. Cache is cleared on logout. Initial data and legacy migration helpers live in `frontend/src/services/firestoreHelpers.ts`.
 
-## Updates and signing
+          ## Updates and signing
 
-`frontend/src/services/version.ts` validates the official GitHub update manifest and APK SHA-256 before opening the Android installer. Release signing is external to Git; the public certificate fingerprint is documented in `docs/android-signing.md`.
+          `frontend/src/services/version.ts` validates the official GitHub update manifest and APK SHA-256 before opening the Android installer. Release signing is external to Git; the public certificate fingerprint is documented in `docs/android-signing.md`.
 
-## GitHub Actions
+          ## GitHub Actions
 
-Existing Android release workflow builds and verifies the signed APK. This review workflow creates a sanitized technical package as a temporary Actions artifact and does not commit artifacts to the repository.
+          Existing Android release workflow builds and verifies the signed APK. This review workflow creates a sanitized technical package as a temporary Actions artifact and does not commit artifacts to the repository.
 
-## Commands
+          ## Commands
 
-- `cd frontend && npm ci`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test`
-- `npm run test:rules`
-- `npm run test:e2e`
-- `npm run build`
-- `npm run cap:sync`
-- `cd frontend/android && ./gradlew lint test assembleDebug`
-"""
+          - `cd frontend && npm ci`
+          - `npm run lint`
+          - `npm run typecheck`
+          - `npm run test`
+          - `npm run test:rules`
+          - `npm run test:e2e`
+          - `npm run build`
+          - `npm run cap:sync`
+          - `cd frontend/android && ./gradlew lint test assembleDebug`
+          """
 
           def git_state() -> str:
               now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -332,18 +332,18 @@ Existing Android release workflow builds and verifies the signed APK. This revie
               commits = run(["git", "log", "-10", "--oneline"]).stdout.strip()
               return f"""# Git state
 
-- workflow_branch: {branch or "detached"}
-- packaged_commit: {head}
-- origin_main: {origin_main}
-- status: {status}
-- packaged_at_utc: {now}
+          - workflow_branch: {branch or "detached"}
+          - packaged_commit: {head}
+          - origin_main: {origin_main}
+          - status: {status}
+          - packaged_at_utc: {now}
 
-## Last 10 commits
+          ## Last 10 commits
 
-```text
-{commits}
-```
-"""
+          ```text
+          {commits}
+          ```
+          """
 
           def dependency_summary() -> str:
               package = read_json(ROOT / "frontend/package.json")
@@ -355,38 +355,38 @@ Existing Android release workflow builds and verifies the signed APK. This revie
               android = tool_version(["bash", "-lc", "echo ${ANDROID_HOME:-${ANDROID_SDK_ROOT:-unavailable}}"])
               return f"""# Dependency summary
 
-## dependencies
+          ## dependencies
 
-```json
-{json.dumps(package.get("dependencies", {}), indent=2, sort_keys=True)}
-```
+          ```json
+          {json.dumps(package.get("dependencies", {}), indent=2, sort_keys=True)}
+          ```
 
-## devDependencies
+          ## devDependencies
 
-```json
-{json.dumps(package.get("devDependencies", {}), indent=2, sort_keys=True)}
-```
+          ```json
+          {json.dumps(package.get("devDependencies", {}), indent=2, sort_keys=True)}
+          ```
 
-## Tool versions
+          ## Tool versions
 
-- Node: {node}
-- npm: {npm}
-- Java: {java}
-- Gradle: {gradle}
-- Android SDK: {android}
+          - Node: {node}
+          - npm: {npm}
+          - Java: {java}
+          - Gradle: {gradle}
+          - Android SDK: {android}
 
-## npm audit
+          ## npm audit
 
-- Result: {audit_text}
-- info: {counts.get("info", 0)}
-- low: {counts.get("low", 0)}
-- moderate: {counts.get("moderate", 0)}
-- high: {counts.get("high", 0)}
-- critical: {counts.get("critical", 0)}
-- total: {counts.get("total", 0)}
+          - Result: {audit_text}
+          - info: {counts.get("info", 0)}
+          - low: {counts.get("low", 0)}
+          - moderate: {counts.get("moderate", 0)}
+          - high: {counts.get("high", 0)}
+          - critical: {counts.get("critical", 0)}
+          - total: {counts.get("total", 0)}
 
-No dependency updates were applied.
-"""
+          No dependency updates were applied.
+          """
 
           def review_priority() -> str:
               priorities = [
