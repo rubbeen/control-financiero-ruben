@@ -2,6 +2,13 @@
 
 | Area | Prueba | Viewport | Datos de prueba | Resultado | Fecha | Comando |
 | --- | --- | --- | --- | --- | --- | --- |
+| Acceso | Registro, verificacion y primer ingreso | 320 x 568 y 740 x 360 | Usuario sintetico | Pasa | 2026-07-13 | `playwright test tests/e2e/registration.spec.ts` |
+| Responsive | Todas las rutas, vertical y horizontal | 320 x 568 a 915 x 412 | Datos sinteticos | Pasa, 13 pruebas | 2026-07-13 | `playwright test tests/e2e/responsive.spec.ts` |
+| Frontend | Servicios y componentes | jsdom | Fixtures sinteticos | Pasa, 34 pruebas | 2026-07-13 | `npm run test` |
+| Seguridad | UID, correo verificado y validacion | Emulator | Identidades ficticias | Pasa, 17 pruebas | 2026-07-13 | `npm run test:rules` |
+| Navegacion | Suite E2E completa | 320 a 1366 px | Datos sinteticos | Pasa, 16; 2 condicionales omitidas | 2026-07-13 | `npm run test:e2e` |
+| Build web | Produccion GitHub | N/A | Configuracion local ignorada | Pasa | 2026-07-13 | `npm run build` |
+| Android GitHub | Lint, test, firma, paquete y APK release | API 35 | Build 1.3.4 (134) | Pasa | 2026-07-13 | `lintGithubRelease testGithubReleaseUnitTest assembleGithubRelease` |
 | Dashboard | Contenido y overflow | 320 x 720 | Cinco movimientos sinteticos | Pasa | 2026-07-10 | `playwright test tests/e2e/dashboard-responsive-content.spec.ts` |
 | Dashboard | Contenido y overflow | 360 x 800 | Cinco movimientos sinteticos | Pasa | 2026-07-10 | `playwright test tests/e2e/dashboard-responsive-content.spec.ts` |
 | Dashboard | Contenido y overflow | 384 x 854 | Cinco movimientos sinteticos | Pasa | 2026-07-10 | `playwright test tests/e2e/dashboard-responsive-content.spec.ts` |

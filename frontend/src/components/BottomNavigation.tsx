@@ -11,11 +11,11 @@ const items = [
 
 export default function BottomNavigation() {
   return (
-    <nav aria-label="Navegacion principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-orange-100 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] shadow-soft backdrop-blur">
+    <nav aria-label="Navegacion principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-orange-100 bg-white/95 pb-[env(safe-area-inset-bottom)] pl-[max(0.25rem,env(safe-area-inset-left))] pr-[max(0.25rem,env(safe-area-inset-right))] shadow-soft backdrop-blur">
       <div className="mx-auto grid max-w-xl grid-cols-5">
         {items.map((item) => {
           const Icon = item.icon;
-          return <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `flex min-h-16 min-w-0 flex-col items-center justify-center gap-1 px-1 py-2 text-xs ${isActive ? 'font-semibold text-primary' : 'text-muted'}`}><Icon className="h-5 w-5" /><span className="truncate">{item.label}</span></NavLink>;
+          return <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `bottom-nav-link flex min-w-0 flex-col items-center justify-center gap-1 px-0.5 py-1 text-[11px] min-[380px]:px-1 min-[380px]:text-xs ${isActive ? 'font-semibold text-primary' : 'text-muted'}`}><Icon className="h-5 w-5" /><span className="max-w-full break-words text-center leading-tight">{item.label}</span></NavLink>;
         })}
       </div>
     </nav>

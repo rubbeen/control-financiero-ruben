@@ -1,5 +1,16 @@
 # Lista de release
 
+## Estado v1.3.4
+
+- [x] Version 1.3.4 (134) sincronizada en package, frontend, Android, script y CI.
+- [x] Registro con confirmacion de contrasena, verificacion de correo y cierre de sesion temporal.
+- [x] Aislamiento por UID y bloqueo de usuarios no verificados comprobados con Emulator.
+- [x] Responsive sin overflow desde 320 px, telefonos, tabletas y orientacion horizontal.
+- [x] Lint, typecheck, 34 unitarias, 17 reglas y 16 E2E completadas; 2 pruebas condicionales omitidas.
+- [x] Generar y verificar APK GitHub release con la firma permanente.
+- [ ] Publicar GitHub Release v1.3.4 y actualizar el manifiesto solo tras comprobar el asset.
+- [x] Publicacion en Google Play pausada por decision del propietario.
+
 ## Estado v1.3.3
 
 - [x] Version 1.3.3 (133), package y API 35 sincronizados.

@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises';
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 const gradle = await readFile(new URL('../android/app/build.gradle', import.meta.url), 'utf8');
 const versionSource = await readFile(new URL('../src/services/version.ts', import.meta.url), 'utf8');
-const expectedName = '1.3.3';
-const expectedCode = 133;
+const expectedName = '1.3.4';
+const expectedCode = 134;
 const values = {
   package: packageJson.version,
   androidName: gradle.match(/versionName\s+"([^"]+)"/)?.[1],

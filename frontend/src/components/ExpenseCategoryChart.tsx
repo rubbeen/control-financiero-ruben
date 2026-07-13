@@ -28,13 +28,13 @@ export default function ExpenseCategoryChart({ data }: Props) {
         {visibleItems.map((item) => {
           const percent = total ? (item.amount / total) * 100 : 0;
           return (
-            <div key={item.category} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+            <div key={item.category} className="grid min-w-0 gap-1 rounded-lg bg-slate-50 px-3 py-2 min-[380px]:grid-cols-[minmax(0,1fr)_max-content] min-[380px]:gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="h-3 w-3 flex-none rounded-full" style={{ backgroundColor: item.color || '#2563EB' }} />
-                <span className="truncate text-sm font-semibold text-text">{item.category}</span>
+                <span className="min-w-0 break-words text-sm font-semibold text-text">{item.category}</span>
               </div>
-              <div className="flex-none text-right">
-                <p className="text-sm font-bold text-text">{formatCurrency(item.amount)}</p>
+              <div className="min-w-0 text-right">
+                <p className="break-words text-sm font-bold text-text">{formatCurrency(item.amount)}</p>
                 <p className="text-xs text-muted">{percent.toFixed(1)}%</p>
               </div>
             </div>

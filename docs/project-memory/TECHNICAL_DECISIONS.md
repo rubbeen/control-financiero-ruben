@@ -1,5 +1,19 @@
 # Decisiones tecnicas
 
+## TD-010: registro propio con verificacion obligatoria
+
+- Decision: permitir `createUserWithEmailAndPassword`, enviar verificacion y cerrar inmediatamente la sesion temporal.
+- Motivo: una persona nueva debe poder crear su espacio sin que una identidad no verificada acceda a Firestore.
+- Alternativas descartadas: cuentas creadas manualmente, acceso inmediato sin verificar y colecciones compartidas.
+- Consecuencias: cada usuario entra solo despues de confirmar el correo y trabaja bajo `users/{uid}`; Google Play permanece pausado y el flujo de eliminacion sigue documentado como requisito previo a retomarlo.
+
+## TD-011: soporte Android desde 320 px y en horizontal
+
+- Decision: usar `100dvh`, safe areas, contenido multilina y puntos de quiebre basados en espacio real.
+- Motivo: Android incluye telefonos compactos, pantallas con recortes, tabletas y orientacion horizontal.
+- Alternativas descartadas: ocultar overflow, reducir globalmente la fuente o mantener dos columnas a cualquier ancho.
+- Consecuencias: las pantallas pequenas pueden crecer verticalmente, pero la informacion y los controles permanecen visibles y utilizables.
+
 ## TD-006: estado asincrono y reintentos Firebase
 
 - Decision: reintentar solo errores transitorios hasta tres veces con 500, 1000 y 2000 ms; errores de acceso no se reintentan.
