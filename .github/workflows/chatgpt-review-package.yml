@@ -195,6 +195,8 @@ jobs:
               r = rel(path)
               if path.is_symlink():
                   return True, "symlink"
+              if r.startswith("frontend/android/app/src/main/assets/public/"):
+                  return True, "generated Capacitor web asset"
               parts = set(path.relative_to(ROOT).parts)
               if parts & excluded_dir_names:
                   return True, "generated or cache directory"
@@ -423,6 +425,7 @@ jobs:
                   "ANDROID_KEY_PASSWORD",
                   "owner@example.test",
                   "other@example.test",
+                  "E2E_TEST_PASSWORD",
               ]
               checks = [
                   ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
