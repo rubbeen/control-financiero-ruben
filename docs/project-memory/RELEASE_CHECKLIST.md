@@ -10,7 +10,7 @@
 - [x] Completar builds web GitHub/Play, lint y tests Android, APK GitHub y AAB Play firmados.
 - [x] Verificar paquete `com.ruben.controlfinanciero`, version 1.3.5 (135) y certificado permanente.
 - [ ] Prueba fisica no ejecutada porque no habia dispositivo ni emulador conectado.
-- [ ] Publicar GitHub Release v1.3.5 y actualizar el manifiesto solo tras verificar el asset.
+- [x] Publicar GitHub Release v1.3.5 y actualizar el manifiesto solo tras verificar el asset.
 
 ## Estado v1.3.4
 

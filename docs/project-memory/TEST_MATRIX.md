@@ -10,6 +10,7 @@
 | Builds web v1.3.5 | Variantes GitHub y Play | N/A | Configuracion local ignorada | Pasa | 2026-07-13 | `npm run build:github` / `npm run build:play` |
 | Android GitHub v1.3.5 | Lint, tests, APK, paquete, version y firma | API 35 | Release 1.3.5 (135) | Pasa | 2026-07-13 | `lintGithubRelease testGithubReleaseUnitTest assembleGithubRelease` |
 | Android Play v1.3.5 | Lint, tests, AAB y firma | API 35 | Release 1.3.5 (135) | Pasa; 0 `.so` | 2026-07-13 | `lintPlayRelease testPlayReleaseUnitTest bundlePlayRelease` |
+| GitHub Release v1.3.5 | Asset, descarga, tamano, SHA-256 y firma | v1.3.5 | APK CI firmada | Pasa | 2026-07-13 | `gh release view` / `gh release download` / `aapt` / `apksigner` |
 | Dispositivo v1.3.5 | Rotacion fisica | Android | N/A | No ejecutada; sin dispositivo ni emulador conectado | 2026-07-13 | `adb devices -l` |
 | Acceso | Registro, verificacion y primer ingreso | 320 x 568 y 740 x 360 | Usuario sintetico | Pasa | 2026-07-13 | `playwright test tests/e2e/registration.spec.ts` |
 | Responsive | Todas las rutas, vertical y horizontal | 320 x 568 a 915 x 412 | Datos sinteticos | Pasa, 13 pruebas | 2026-07-13 | `playwright test tests/e2e/responsive.spec.ts` |
