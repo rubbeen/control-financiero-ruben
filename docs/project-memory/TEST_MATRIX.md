@@ -9,6 +9,7 @@
 | Navegacion | Suite E2E completa | 320 a 1366 px | Datos sinteticos | Pasa, 16; 2 condicionales omitidas | 2026-07-13 | `npm run test:e2e` |
 | Build web | Produccion GitHub | N/A | Configuracion local ignorada | Pasa | 2026-07-13 | `npm run build` |
 | Android GitHub | Lint, test, firma, paquete y APK release | API 35 | Build 1.3.4 (134) | Pasa | 2026-07-13 | `lintGithubRelease testGithubReleaseUnitTest assembleGithubRelease` |
+| GitHub Release | Asset, tamano, SHA-256 y descarga publicada | v1.3.4 | APK CI firmada | Pasa | 2026-07-13 | `gh release view` / `gh release download` / `apksigner` |
 | Dashboard | Contenido y overflow | 320 x 720 | Cinco movimientos sinteticos | Pasa | 2026-07-10 | `playwright test tests/e2e/dashboard-responsive-content.spec.ts` |
 | Dashboard | Contenido y overflow | 360 x 800 | Cinco movimientos sinteticos | Pasa | 2026-07-10 | `playwright test tests/e2e/dashboard-responsive-content.spec.ts` |
 | Dashboard | Contenido y overflow | 384 x 854 | Cinco movimientos sinteticos | Pasa | 2026-07-10 | `playwright test tests/e2e/dashboard-responsive-content.spec.ts` |
