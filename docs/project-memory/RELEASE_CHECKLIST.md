@@ -8,7 +8,7 @@
 - [x] Responsive sin overflow desde 320 px, telefonos, tabletas y orientacion horizontal.
 - [x] Lint, typecheck, 34 unitarias, 17 reglas y 16 E2E completadas; 2 pruebas condicionales omitidas.
 - [x] Generar y verificar APK GitHub release con la firma permanente.
-- [ ] Publicar GitHub Release v1.3.4 y actualizar el manifiesto solo tras comprobar el asset.
+- [x] Publicar GitHub Release v1.3.4 y actualizar el manifiesto solo tras comprobar el asset.
 - [x] Publicacion en Google Play pausada por decision del propietario.
 
 ## Estado v1.3.3

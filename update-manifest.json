@@ -1,17 +1,16 @@
 {
-  "versionName": "1.3.3",
-  "versionCode": 133,
+  "versionName": "1.3.4",
+  "versionCode": 134,
   "minimumSupportedVersionCode": 132,
-  "publishedAt": "2026-07-13T18:12:54Z",
-  "apkUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/download/v1.3.3/control-financiero-ruben-v1.3.3.apk",
-  "sha256": "67b66a71802e683537aae30971ef4c9bc83f329be7fb5f8534fe8e23edf2094c",
-  "fileSizeBytes": 1997699,
+  "publishedAt": "2026-07-13T19:24:42Z",
+  "apkUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/download/v1.3.4/control-financiero-ruben-v1.3.4.apk",
+  "sha256": "60680a3afebdfa34e2b46b037e43391ec88a2cedcc17b394e01c9957306b3284",
+  "fileSizeBytes": 1999316,
   "mandatory": false,
-  "releasePageUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/tag/v1.3.3",
+  "releasePageUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/tag/v1.3.4",
   "releaseNotes": [
-    "Corrige el falso error de conexion durante la carga inicial y mantiene los datos visibles al refrescar.",
-    "Permite guardar, compartir y abrir PDF, CSV y respaldos de forma fiable en Android.",
-    "Agrega proteccion de capturas configurable y prepara una variante privada para Google Play.",
-    "Las versiones 1.3.1 o anteriores requieren instalar esta actualizacion manualmente desde GitHub."
+    "Permite crear una cuenta y exige verificar el correo antes del primer acceso.",
+    "Adapta todas las pantallas a telefonos y tabletas Android en vertical y horizontal.",
+    "Mantiene nombres, descripciones, valores COP y graficas visibles en pantallas pequenas."
   ]
 }
