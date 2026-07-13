@@ -10,3 +10,4 @@ Lee `docs/project-memory/KNOWN_ISSUES_AND_FIXES.md` y `TECHNICAL_DECISIONS.md` a
 - Publicacion: PR y validaciones primero. Publica Release y manifiesto solo con APK release firmada, compatible y verificada; nunca presentes una APK debug como release segura.
 - Firma Android: reutiliza siempre la identidad release permanente documentada en `docs/android-signing.md`; el keystore y sus credenciales permanecen fuera de Git y la huella se valida en CI.
 - Firebase: no despliegues reglas ni migres produccion desde una tarea de interfaz sin autorizacion separada.
+- Paquetes para revision: usa el workflow manual `ChatGPT review package`; nunca compartas carpetas completas con `node_modules`, builds, caches, `.git`, keystores, secrets, respaldos o datos reales. Valida siempre checksum y extraccion antes de entregar el artifact.

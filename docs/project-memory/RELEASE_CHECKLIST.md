@@ -11,6 +11,7 @@
 - [ ] Actualizar `update-manifest.json` solo despues de publicar y verificar los assets.
 - [ ] Probar despues de publicar: deteccion, notas, descarga, SHA-256 e instalador.
 - [ ] Mantener APK, keystore, propiedades, reportes y capturas fuera de Git.
+- [ ] Para revision externa, usar el workflow `ChatGPT review package`; confirmar que el ZIP excluye `node_modules`, builds, caches, `.git`, keystores, secrets, respaldos y datos reales, y descargar el artifact antes de que expire.
 
 ## Estado v1.3.2
 

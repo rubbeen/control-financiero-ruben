@@ -134,3 +134,13 @@
 - Pruebas que validan la solucion: workflow Android completo y huella publica igual a `EXPECTED_CERT_SHA256`.
 - Como detectar una regresion: huella vacia o error explicito `Unexpected APK signing certificate`.
 - Que no volver a hacer: no parsear texto humano de `apksigner` para obtener la identidad criptografica.
+
+## PACKAGE-001
+
+- Identificador: PACKAGE-001.
+- Fecha: 2026-07-13.
+- Sintoma: compartir un directorio local completo produce paquetes enormes y puede arrastrar caches, builds, historial Git, APKs, respaldos o secretos.
+- Contexto donde aparecio: preparacion de material para revision externa de ChatGPT.
+- Causa raiz confirmada: una copia de workspace no distingue codigo versionado util de artefactos generados o informacion sensible.
+- Solucion que funciona: generar paquetes de revision solo con el workflow manual `ChatGPT review package`, con exclusiones, escaneo de secretos, metadatos, checksum y extraccion de prueba.
+- Que no volver a hacer: no volver a intentar compartir un archivo masivo cuando el codigo versionado puede empaquetarse de forma verificable en menos de 100 MB.

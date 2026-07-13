@@ -1,0 +1,725 @@
+name: ChatGPT review package
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag, or commit to package
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_VERSION: "1.3.2"
+      EXPECTED_VERSION_CODE: "132"
+      EXPECTED_APPLICATION_ID: "com.ruben.controlfinanciero"
+      EXPECTED_CERT_SHA256: "8457C0879F10049FD9CC2E5BFA5B3B124A023E358BAF0EBFAF4256F53D9E0C4E"
+      PACKAGE_DIR: chatgpt-review-package
+      ZIP_NAME: control-financiero-chatgpt-review.zip
+      ARTIFACT_NAME: control-financiero-chatgpt-review
+    steps:
+      - name: Checkout requested ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+          fetch-depth: 0
+
+      - name: Setup Node.js for metadata
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build secure review package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from __future__ import annotations
+
+          import csv
+          import hashlib
+          import json
+          import os
+          import re
+          import shutil
+          import stat
+          import subprocess
+          import sys
+          import tempfile
+          import time
+          import urllib.request
+          import zipfile
+          from pathlib import Path
+
+          ROOT = Path.cwd()
+          PACKAGE_DIR = Path(os.environ["PACKAGE_DIR"])
+          ZIP_NAME = os.environ["ZIP_NAME"]
+          EXPECTED_VERSION = os.environ["EXPECTED_VERSION"]
+          EXPECTED_VERSION_CODE = os.environ["EXPECTED_VERSION_CODE"]
+          EXPECTED_APPLICATION_ID = os.environ["EXPECTED_APPLICATION_ID"]
+          EXPECTED_CERT_SHA256 = os.environ["EXPECTED_CERT_SHA256"]
+          MAX_SOURCE_FILE_BYTES = 25 * 1024 * 1024
+          MAX_ZIP_BYTES = 100 * 1024 * 1024
+          APK_MAX_BYTES = 25 * 1024 * 1024
+
+          excluded: list[dict[str, str]] = []
+          large_files: list[str] = []
+          sensitive_excluded: list[str] = []
+          security_findings: list[dict[str, str]] = []
+          false_positives: list[str] = []
+          apk_status = {
+              "included": False,
+              "verified": False,
+              "reason": "APK verification did not run.",
+              "size": 0,
+              "sha256": "",
+          }
+
+          include_dirs = [
+              ".github",
+              "docs",
+              "scripts",
+              "frontend/src",
+              "frontend/tests",
+              "frontend/android/app/src",
+              "frontend/android/gradle",
+          ]
+          include_files = [
+              ".gitignore",
+              "AGENTS.md",
+              "README.md",
+              "firebase.json",
+              "firestore.rules",
+              "firestore.rules.transition",
+              "firestore.indexes.json",
+              "storage.rules",
+              "update-manifest.json",
+              "frontend/.env.example",
+              "frontend/capacitor.config.ts",
+              "frontend/package.json",
+              "frontend/package-lock.json",
+              "frontend/index.html",
+              "frontend/vite.config.ts",
+              "frontend/tsconfig.json",
+              "frontend/tailwind.config.js",
+              "frontend/postcss.config.js",
+              "frontend/eslint.config.js",
+              "frontend/playwright.config.ts",
+              "frontend/vitest.config.ts",
+              "frontend/android/gradlew",
+              "frontend/android/gradlew.bat",
+              "frontend/android/build.gradle",
+              "frontend/android/settings.gradle",
+              "frontend/android/variables.gradle",
+              "frontend/android/gradle.properties",
+              "frontend/android/keystore.properties.example",
+              "frontend/android/app/build.gradle",
+              "frontend/android/app/proguard-rules.pro",
+          ]
+          critical_paths = [
+              "frontend/src/services/reports.ts",
+              "frontend/src/pages/Reports.tsx",
+              "frontend/src/pages/Dashboard.tsx",
+              "frontend/src/hooks/useFinanceQueries.ts",
+              "frontend/src/services/queryClient.ts",
+              "frontend/src/services/version.ts",
+              "frontend/src/services/auth.ts",
+              "frontend/src/services/firebase.ts",
+              "frontend/src/services/movements.ts",
+              "frontend/src/services/firestoreHelpers.ts",
+              "frontend/src/context/AccountContext.tsx",
+              "frontend/src/App.tsx",
+              "frontend/src/index.css",
+              "frontend/android/app/src/main/AndroidManifest.xml",
+              "frontend/android/app/src/main/java/com/ruben/controlfinanciero/MainActivity.java",
+              "frontend/android/app/build.gradle",
+              "frontend/capacitor.config.ts",
+              ".github/workflows/android-release.yml",
+              "firestore.rules",
+              "firestore.indexes.json",
+              "storage.rules",
+              "frontend/package.json",
+              "frontend/package-lock.json",
+              "AGENTS.md",
+              "docs/project-memory/KNOWN_ISSUES_AND_FIXES.md",
+              "docs/project-memory/TECHNICAL_DECISIONS.md",
+              "docs/project-memory/RELEASE_CHECKLIST.md",
+              "docs/project-memory/TEST_MATRIX.md",
+          ]
+          secret_name_patterns = [
+              re.compile(r"(^|/)\.env($|\.)"),
+              re.compile(r"(^|/)(keystore|key)\.properties$", re.I),
+              re.compile(r"(^|/)local\.properties$", re.I),
+              re.compile(r"\.(jks|keystore|p12|pfx|key|pem)$", re.I),
+              re.compile(r"(^|/).*(service-account|firebase-admin|credentials|secrets).*\.json$", re.I),
+              re.compile(r"\.(cfrbackup|sqlite|sqlite3|db|apk|aab)$", re.I),
+          ]
+          excluded_dir_names = {
+              ".git", "node_modules", "dist", "build", ".gradle", ".firebase",
+              "coverage", "test-results", "playwright-report", "performance-traces",
+              "__pycache__", ".pytest_cache", ".vite", "release-output",
+              "release-artifact", "local-release", "AUDIT_HANDOFF",
+              "LOCAL_RELEASE_REPORT", "HARDENING_REPORT",
+          }
+          generated_suffixes = {
+              ".log", ".tmp", ".temp", ".pyc", ".pyo", ".map", ".trace", ".zip",
+          }
+          forbidden_zip_parts = {
+              ".git", "node_modules", "dist", "build", ".gradle", "coverage",
+              "test-results", "playwright-report", "performance-traces", "__pycache__",
+          }
+
+          def run(cmd: list[str], cwd: Path = ROOT, check: bool = False) -> subprocess.CompletedProcess[str]:
+              return subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=check)
+
+          def rel(path: Path) -> str:
+              return path.relative_to(ROOT).as_posix()
+
+          def sha256(path: Path) -> str:
+              h = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          def should_exclude(path: Path) -> tuple[bool, str]:
+              r = rel(path)
+              if path.is_symlink():
+                  return True, "symlink"
+              parts = set(path.relative_to(ROOT).parts)
+              if parts & excluded_dir_names:
+                  return True, "generated or cache directory"
+              if any(pattern.search(r) for pattern in secret_name_patterns):
+                  if r.endswith(".env.example") or r.endswith("keystore.properties.example"):
+                      return False, ""
+                  return True, "sensitive filename or disallowed artifact type"
+              if path.suffix.lower() in generated_suffixes:
+                  return True, "generated or compressed file"
+              if path.name in {"bundle-stats.html"}:
+                  return True, "heavy generated report"
+              try:
+                  size = path.stat().st_size
+              except OSError:
+                  return True, "unreadable"
+              if size > MAX_SOURCE_FILE_BYTES:
+                  large_files.append(f"{r} ({size} bytes)")
+                  return True, "source file over 25 MB"
+              return False, ""
+
+          def copy_file(src: Path) -> None:
+              if not src.exists() or not src.is_file():
+                  return
+              excluded_file, reason = should_exclude(src)
+              if excluded_file:
+                  item = {"path": rel(src), "reason": reason}
+                  excluded.append(item)
+                  if "sensitive" in reason:
+                      sensitive_excluded.append(item["path"])
+                  return
+              dst = PACKAGE_DIR / rel(src)
+              dst.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(src, dst)
+
+          def copy_tree(src_dir: Path) -> None:
+              if not src_dir.exists():
+                  return
+              for src in src_dir.rglob("*"):
+                  if src.is_dir():
+                      continue
+                  copy_file(src)
+
+          def read_json(path: Path) -> dict:
+              return json.loads(path.read_text(encoding="utf-8"))
+
+          def text_or_empty(path: Path) -> str:
+              try:
+                  return path.read_text(encoding="utf-8", errors="replace")
+              except Exception:
+                  return ""
+
+          def tool_version(command: list[str], cwd: Path = ROOT) -> str:
+              try:
+                  result = run(command, cwd=cwd)
+                  return (result.stdout or "").strip().splitlines()[0] if result.stdout.strip() else "not reported"
+              except Exception as exc:
+                  return f"unavailable: {exc.__class__.__name__}"
+
+          def npm_audit_summary() -> tuple[str, dict[str, int]]:
+              try:
+                  result = subprocess.run(["npm", "audit", "--json"], cwd=ROOT / "frontend", text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120)
+                  payload = json.loads(result.stdout or "{}")
+                  vulnerabilities = payload.get("metadata", {}).get("vulnerabilities", {})
+                  counts = {key: int(vulnerabilities.get(key, 0) or 0) for key in ["info", "low", "moderate", "high", "critical", "total"]}
+                  return "npm audit completed without dependency changes.", counts
+              except Exception as exc:
+                  return f"npm audit unavailable: {exc.__class__.__name__}", {"info": 0, "low": 0, "moderate": 0, "high": 0, "critical": 0, "total": 0}
+
+          def make_project_summary() -> str:
+              package = read_json(ROOT / "frontend/package.json")
+              variables = text_or_empty(ROOT / "frontend/android/variables.gradle")
+              app_gradle = text_or_empty(ROOT / "frontend/android/app/build.gradle")
+              capacitor = text_or_empty(ROOT / "frontend/capacitor.config.ts")
+              compile_sdk = re.search(r"compileSdkVersion\s*=\s*(\d+)", variables)
+              target_sdk = re.search(r"targetSdkVersion\s*=\s*(\d+)", variables)
+              min_sdk = re.search(r"minSdkVersion\s*=\s*(\d+)", variables)
+              version_code = re.search(r"versionCode\s+(\d+)", app_gradle)
+              version_name = re.search(r'versionName\s+"([^"]+)"', app_gradle)
+              app_id = re.search(r"appId:\s*'([^']+)'", capacitor)
+              return f"""# Project summary
+
+- Name: Control Financiero Ruben.
+- Repository: rubbeen/control-financiero-ruben.
+- Version: {package.get("version")}.
+- Android versionName: {version_name.group(1) if version_name else "unknown"}.
+- Android versionCode: {version_code.group(1) if version_code else "unknown"}.
+- applicationId: {app_id.group(1) if app_id else "unknown"}.
+- compileSdk: {compile_sdk.group(1) if compile_sdk else "unknown"}.
+- targetSdk: {target_sdk.group(1) if target_sdk else "unknown"}.
+- minSdk: {min_sdk.group(1) if min_sdk else "unknown"}.
+
+## Architecture
+
+React, TypeScript, Vite, Tailwind CSS, React Router, TanStack React Query, Firebase Auth, Cloud Firestore and Capacitor Android. The app reads and writes Firestore directly under `users/{{uid}}`; no local Python backend is required for the current architecture.
+
+## Firebase and data model
+
+Firebase Auth requires a verified account. Firestore rules isolate data by authenticated UID and validate document fields. Main collections are `accounts`, `categories`, `movements`, `budgets`, plus `meta/counters` and `meta/initialization` under each user document.
+
+## Functional areas
+
+Accounts isolate balances and analysis by financial folder. Movements support income, expense, purchase, transfer and adjustment. Transfers create paired movements with a shared transfer group and update source/destination balances transactionally. Budgets are monthly and account-scoped. Reports use PDF generation code in `frontend/src/services/reports.ts`. Backups use encrypted `.cfrbackup` logic in source, but backup files are excluded from this package.
+
+## Runtime and cache
+
+React Query keeps in-memory cache keyed by UID and account. Cache is cleared on logout. Initial data and legacy migration helpers live in `frontend/src/services/firestoreHelpers.ts`.
+
+## Updates and signing
+
+`frontend/src/services/version.ts` validates the official GitHub update manifest and APK SHA-256 before opening the Android installer. Release signing is external to Git; the public certificate fingerprint is documented in `docs/android-signing.md`.
+
+## GitHub Actions
+
+Existing Android release workflow builds and verifies the signed APK. This review workflow creates a sanitized technical package as a temporary Actions artifact and does not commit artifacts to the repository.
+
+## Commands
+
+- `cd frontend && npm ci`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run test:rules`
+- `npm run test:e2e`
+- `npm run build`
+- `npm run cap:sync`
+- `cd frontend/android && ./gradlew lint test assembleDebug`
+"""
+
+          def git_state() -> str:
+              now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+              branch = run(["git", "branch", "--show-current"]).stdout.strip()
+              head = run(["git", "rev-parse", "HEAD"]).stdout.strip()
+              origin_main = run(["git", "rev-parse", "origin/main"]).stdout.strip()
+              status = run(["git", "status", "--short"]).stdout.strip() or "clean"
+              commits = run(["git", "log", "-10", "--oneline"]).stdout.strip()
+              return f"""# Git state
+
+- workflow_branch: {branch or "detached"}
+- packaged_commit: {head}
+- origin_main: {origin_main}
+- status: {status}
+- packaged_at_utc: {now}
+
+## Last 10 commits
+
+```text
+{commits}
+```
+"""
+
+          def dependency_summary() -> str:
+              package = read_json(ROOT / "frontend/package.json")
+              audit_text, counts = npm_audit_summary()
+              node = tool_version(["node", "--version"])
+              npm = tool_version(["npm", "--version"])
+              java = tool_version(["java", "-version"])
+              gradle = tool_version(["bash", "-lc", "cd frontend/android && ./gradlew --version --no-daemon | sed -n '1,8p'"])
+              android = tool_version(["bash", "-lc", "echo ${ANDROID_HOME:-${ANDROID_SDK_ROOT:-unavailable}}"])
+              return f"""# Dependency summary
+
+## dependencies
+
+```json
+{json.dumps(package.get("dependencies", {}), indent=2, sort_keys=True)}
+```
+
+## devDependencies
+
+```json
+{json.dumps(package.get("devDependencies", {}), indent=2, sort_keys=True)}
+```
+
+## Tool versions
+
+- Node: {node}
+- npm: {npm}
+- Java: {java}
+- Gradle: {gradle}
+- Android SDK: {android}
+
+## npm audit
+
+- Result: {audit_text}
+- info: {counts.get("info", 0)}
+- low: {counts.get("low", 0)}
+- moderate: {counts.get("moderate", 0)}
+- high: {counts.get("high", 0)}
+- critical: {counts.get("critical", 0)}
+- total: {counts.get("total", 0)}
+
+No dependency updates were applied.
+"""
+
+          def review_priority() -> str:
+              priorities = [
+                  "El PDF no se guarda correctamente en Android.",
+                  "El Dashboard muestra un error rojo durante demoras transitorias.",
+                  "Permitir capturas y grabacion mediante una preferencia de privacidad.",
+                  "Seguridad Android y WebView.",
+                  "Seguridad Firebase.",
+                  "Escalabilidad.",
+                  "Diseno responsive.",
+                  "Accesibilidad.",
+                  "Rendimiento y consultas.",
+                  "Preparacion para Google Play.",
+                  "APK y AAB.",
+                  "Distribucion GitHub frente a distribucion Play.",
+                  "CI/CD.",
+                  "Pruebas.",
+                  "Memoria persistente de errores y soluciones.",
+              ]
+              return "# Review priority\n\n" + "\n".join(f"{index}. {item}" for index, item in enumerate(priorities, 1)) + "\n"
+
+          def safe_scan_file(path: Path) -> None:
+              r = path.relative_to(PACKAGE_DIR).as_posix()
+              if path.stat().st_size > 2 * 1024 * 1024:
+                  return
+              text = path.read_text(encoding="utf-8", errors="replace")
+              allowed_examples = [
+                  "SET_OUTSIDE_REPOSITORY",
+                  "secrets.",
+                  "VITE_FIREBASE_",
+                  "ANDROID_KEYSTORE_BASE64",
+                  "ANDROID_KEYSTORE_PASSWORD",
+                  "ANDROID_KEY_ALIAS",
+                  "ANDROID_KEY_PASSWORD",
+                  "owner@example.test",
+                  "other@example.test",
+              ]
+              checks = [
+                  ("private-key", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+                  ("token-assignment", re.compile(r"(?i)(token|secret|password|client_secret|private_key)\s*[:=]\s*['\"]?([A-Za-z0-9_./+=-]{16,})")),
+                  ("jwt", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
+              ]
+              for rule, pattern in checks:
+                  for match in pattern.finditer(text):
+                      snippet = text[max(0, match.start() - 60): match.end() + 60]
+                      if any(marker in snippet for marker in allowed_examples):
+                          false_positives.append(f"{r}: {rule} allowed example or secret variable reference")
+                          continue
+                      security_findings.append({"path": r, "rule": rule, "type": "possible secret value"})
+
+          def final_security_scan() -> None:
+              for path in PACKAGE_DIR.rglob("*"):
+                  if path.is_file():
+                      r = path.relative_to(PACKAGE_DIR).as_posix()
+                      allowed_release_apk = r == "artifacts/control-financiero-ruben-current-release.apk" and apk_status["verified"]
+                      if any(pattern.search(r) for pattern in secret_name_patterns) and not (r.endswith(".env.example") or r.endswith("keystore.properties.example") or allowed_release_apk):
+                          security_findings.append({"path": r, "rule": "sensitive filename", "type": "forbidden file in staging"})
+                      if not allowed_release_apk:
+                          safe_scan_file(path)
+
+          def download_and_verify_apk() -> None:
+              release_url = f"https://api.github.com/repos/rubbeen/control-financiero-ruben/releases/tags/v{EXPECTED_VERSION}"
+              try:
+                  with urllib.request.urlopen(release_url, timeout=30) as response:
+                      release = json.loads(response.read().decode("utf-8"))
+                  if release.get("tag_name") != f"v{EXPECTED_VERSION}":
+                      apk_status["reason"] = "Release tag did not match expected version."
+                      return
+                  assets = release.get("assets", [])
+                  asset = next((item for item in assets if item.get("name") == f"control-financiero-ruben-v{EXPECTED_VERSION}.apk"), None)
+                  if not asset:
+                      apk_status["reason"] = "Release APK asset not found."
+                      return
+                  if int(asset.get("size", 0)) > APK_MAX_BYTES:
+                      apk_status["reason"] = "Release APK asset is over 25 MB."
+                      return
+                  apk_dir = PACKAGE_DIR / "artifacts"
+                  apk_dir.mkdir(parents=True, exist_ok=True)
+                  apk_path = apk_dir / "control-financiero-ruben-current-release.apk"
+                  with urllib.request.urlopen(asset["browser_download_url"], timeout=90) as response, apk_path.open("wb") as out:
+                      shutil.copyfileobj(response, out)
+                  apk_size = apk_path.stat().st_size
+                  apk_hash = sha256(apk_path)
+                  apk_status.update({"size": apk_size, "sha256": apk_hash})
+                  digest = str(asset.get("digest", ""))
+                  if digest.startswith("sha256:") and digest.removeprefix("sha256:").lower() != apk_hash.lower():
+                      apk_path.unlink(missing_ok=True)
+                      apk_status["reason"] = "Downloaded APK SHA-256 did not match GitHub asset digest."
+                      return
+
+                  sdk_root = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+                  if not sdk_root:
+                      apk_path.unlink(missing_ok=True)
+                      apk_status["reason"] = "Android SDK not available for APK verification."
+                      return
+                  build_tools = sorted(Path(sdk_root, "build-tools").glob("*"))
+                  if not build_tools:
+                      apk_path.unlink(missing_ok=True)
+                      apk_status["reason"] = "Android build-tools not available for APK verification."
+                      return
+                  tools = build_tools[-1]
+                  aapt = tools / "aapt"
+                  apksigner = tools / "apksigner"
+                  badging = run([str(aapt), "dump", "badging", str(apk_path)], check=True).stdout
+                  package_line = badging.splitlines()[0] if badging.splitlines() else ""
+                  if f"name='{EXPECTED_APPLICATION_ID}'" not in package_line or f"versionCode='{EXPECTED_VERSION_CODE}'" not in package_line or f"versionName='{EXPECTED_VERSION}'" not in package_line:
+                      apk_path.unlink(missing_ok=True)
+                      apk_status["reason"] = "APK package metadata did not match expected application/version."
+                      return
+                  if "application-debuggable" in badging:
+                      apk_path.unlink(missing_ok=True)
+                      apk_status["reason"] = "APK is debuggable."
+                      return
+                  run([str(apksigner), "verify", "--verbose", "--print-certs", str(apk_path)], check=True)
+                  with tempfile.TemporaryDirectory() as tmp:
+                      cert_pem = Path(tmp) / "certificate.pem"
+                      with cert_pem.open("w", encoding="utf-8") as handle:
+                          subprocess.run(["keytool", "-printcert", "-jarfile", str(apk_path), "-rfc"], stdout=handle, stderr=subprocess.STDOUT, text=True, check=True)
+                      cert = run(["openssl", "x509", "-in", str(cert_pem), "-noout", "-fingerprint", "-sha256"], check=True).stdout
+                  cert_hash = cert.split("=", 1)[1].strip().replace(":", "").upper()
+                  if cert_hash != EXPECTED_CERT_SHA256:
+                      apk_path.unlink(missing_ok=True)
+                      apk_status["reason"] = "APK signing certificate fingerprint did not match expected release fingerprint."
+                      return
+                  apk_status.update({"included": True, "verified": True, "reason": "APK verified and included."})
+              except Exception as exc:
+                  target = PACKAGE_DIR / "artifacts" / "control-financiero-ruben-current-release.apk"
+                  target.unlink(missing_ok=True)
+                  apk_status["reason"] = f"APK verification failed: {exc.__class__.__name__}"
+
+          def write_metadata() -> None:
+              metadata = PACKAGE_DIR / "metadata"
+              metadata.mkdir(parents=True, exist_ok=True)
+              (metadata / "PROJECT_SUMMARY.md").write_text(make_project_summary(), encoding="utf-8")
+              (metadata / "GIT_STATE.txt").write_text(git_state(), encoding="utf-8")
+              (metadata / "REVIEW_PRIORITY.md").write_text(review_priority(), encoding="utf-8")
+              (metadata / "DEPENDENCY_SUMMARY.md").write_text(dependency_summary(), encoding="utf-8")
+
+              files = sorted(path for path in PACKAGE_DIR.rglob("*") if path.is_file())
+              tree = "\n".join(path.relative_to(PACKAGE_DIR).as_posix() for path in files) + "\n"
+              (metadata / "PROJECT_TREE.txt").write_text(tree, encoding="utf-8")
+              with (metadata / "FILE_MANIFEST.csv").open("w", encoding="utf-8", newline="") as handle:
+                  writer = csv.writer(handle)
+                  writer.writerow(["relative_path", "size_bytes", "sha256"])
+                  for path in files:
+                      writer.writerow([path.relative_to(PACKAGE_DIR).as_posix(), path.stat().st_size, sha256(path)])
+
+              excluded_text = [
+                  "# Excluded items",
+                  "",
+                  "## Patterns",
+                  "",
+                  "- .git, node_modules, dist, build, .gradle, caches, coverage, reports, generated files.",
+                  "- .env except .env.example.",
+                  "- keystores, private properties, service accounts, credentials JSON, databases, backups, APK/AAB artifacts.",
+                  "- Source files over 25 MB.",
+                  "",
+                  f"## Counts",
+                  "",
+                  f"- Total excluded files: {len(excluded)}",
+                  f"- Sensitive-path exclusions: {len(sensitive_excluded)}",
+                  f"- Large files found: {len(large_files)}",
+                  "",
+                  "## Excluded files by path and reason",
+                  "",
+              ]
+              for item in sorted(excluded, key=lambda value: value["path"]):
+                  excluded_text.append(f"- `{item['path']}`: {item['reason']}")
+              if large_files:
+                  excluded_text.extend(["", "## Large files", ""])
+                  excluded_text.extend(f"- {item}" for item in large_files)
+              (metadata / "EXCLUDED_ITEMS.md").write_text("\n".join(excluded_text) + "\n", encoding="utf-8")
+
+              scan = [
+                  "# Security scan",
+                  "",
+                  "- Tool: built-in filename and content scanner; gitleaks-compatible intent without repository history.",
+                  f"- Findings: {len(security_findings)}",
+                  f"- Files excluded by sensitive route/type: {len(sensitive_excluded)}",
+                  f"- False positives confirmed: {len(false_positives)}",
+                  f"- APK included: {'yes' if apk_status['included'] else 'no'}",
+                  f"- APK verified: {'yes' if apk_status['verified'] else 'no'}",
+                  f"- APK status: {apk_status['reason']}",
+                  "",
+                  "## Findings",
+                  "",
+              ]
+              if security_findings:
+                  scan.extend(f"- `{item['path']}`: {item['rule']} ({item['type']})" for item in security_findings)
+              else:
+                  scan.append("- None.")
+              if false_positives:
+                  scan.extend(["", "## False positives", ""])
+                  scan.extend(f"- {item}" for item in sorted(set(false_positives)))
+              scan.extend(["", "## Final result", ""])
+              scan.append("The final staging directory contains no known real secrets based on this scanner." if not security_findings else "The final staging directory still has possible secret findings.")
+              (metadata / "SECURITY_SCAN.md").write_text("\n".join(scan) + "\n", encoding="utf-8")
+
+          def verify_critical_files() -> None:
+              missing = []
+              for item in critical_paths:
+                  path = PACKAGE_DIR / item
+                  if not path.exists() or path.stat().st_size == 0:
+                      missing.append(item)
+              if missing:
+                  raise SystemExit("Missing or empty critical files in package: " + ", ".join(missing))
+
+          def verify_no_forbidden_paths() -> None:
+              for path in PACKAGE_DIR.rglob("*"):
+                  if not path.is_file():
+                      continue
+                  r = path.relative_to(PACKAGE_DIR)
+                  if any(part in forbidden_zip_parts for part in r.parts):
+                      raise SystemExit(f"Forbidden path remains in package: {r.as_posix()}")
+                  if path.is_symlink():
+                      raise SystemExit(f"Symlink remains in package: {r.as_posix()}")
+                  if ".." in r.parts or str(r).startswith("/"):
+                      raise SystemExit(f"Unsafe path remains in package: {r.as_posix()}")
+
+          def create_and_verify_zip() -> dict[str, str | int]:
+              if Path(ZIP_NAME).exists():
+                  Path(ZIP_NAME).unlink()
+              with zipfile.ZipFile(ZIP_NAME, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
+                  for path in sorted(PACKAGE_DIR.rglob("*")):
+                      if not path.is_file():
+                          continue
+                      info = zipfile.ZipInfo(path.relative_to(PACKAGE_DIR).as_posix())
+                      mode = path.stat().st_mode
+                      if path.name == "gradlew":
+                          mode |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+                      info.external_attr = (mode & 0xFFFF) << 16
+                      info.date_time = time.gmtime(path.stat().st_mtime)[:6]
+                      with path.open("rb") as handle:
+                          zf.writestr(info, handle.read(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+              zip_path = Path(ZIP_NAME)
+              if zip_path.stat().st_size > MAX_ZIP_BYTES:
+                  raise SystemExit(f"ZIP is over 100 MB: {zip_path.stat().st_size}")
+              zip_hash = sha256(zip_path)
+              Path(f"{ZIP_NAME}.sha256.txt").write_text(f"{zip_hash}  {ZIP_NAME}\n", encoding="utf-8")
+
+              with tempfile.TemporaryDirectory() as tmp:
+                  extract_dir = Path(tmp) / "extract"
+                  with zipfile.ZipFile(zip_path) as zf:
+                      names = zf.namelist()
+                      for name in names:
+                          parts = Path(name).parts
+                          if name.startswith("/") or ".." in parts:
+                              raise SystemExit(f"Unsafe zip member: {name}")
+                          if any(part in forbidden_zip_parts for part in parts):
+                              raise SystemExit(f"Forbidden zip member: {name}")
+                      zf.extractall(extract_dir)
+                  original_files = sorted(path.relative_to(PACKAGE_DIR).as_posix() for path in PACKAGE_DIR.rglob("*") if path.is_file())
+                  extracted_files = sorted(path.relative_to(extract_dir).as_posix() for path in extract_dir.rglob("*") if path.is_file())
+                  if original_files != extracted_files:
+                      raise SystemExit("Extracted file list does not match staging file list.")
+                  sample = original_files[:20] + original_files[-20:]
+                  for name in sorted(set(sample)):
+                      if sha256(PACKAGE_DIR / name) != sha256(extract_dir / name):
+                          raise SystemExit(f"Checksum mismatch after extraction: {name}")
+                  for item in critical_paths:
+                      target = extract_dir / item
+                      if not target.exists() or target.stat().st_size == 0:
+                          raise SystemExit(f"Critical file missing after extraction: {item}")
+              return {
+                  "zip_name": ZIP_NAME,
+                  "zip_size": zip_path.stat().st_size,
+                  "zip_sha256": zip_hash,
+                  "file_count": len([p for p in PACKAGE_DIR.rglob("*") if p.is_file()]),
+                  "excluded_count": len(excluded),
+              }
+
+          def write_package_result(result: dict[str, str | int]) -> None:
+              data = {
+                  **result,
+                  "artifact_name": os.environ["ARTIFACT_NAME"],
+                  "apk_included": apk_status["included"],
+                  "apk_verified": apk_status["verified"],
+                  "apk_size": apk_status["size"],
+                  "apk_sha256": apk_status["sha256"],
+                  "secret_findings": len(security_findings),
+                  "sensitive_excluded": len(sensitive_excluded),
+                  "extraction_verified": True,
+                  "critical_files_verified": True,
+              }
+              Path("package-result.json").write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+          if PACKAGE_DIR.exists():
+              shutil.rmtree(PACKAGE_DIR)
+          PACKAGE_DIR.mkdir(parents=True)
+          for directory in include_dirs:
+              copy_tree(ROOT / directory)
+          for filename in include_files:
+              copy_file(ROOT / filename)
+
+          package_json = read_json(ROOT / "frontend/package.json")
+          if package_json.get("version") != EXPECTED_VERSION:
+              raise SystemExit("Unexpected frontend package version.")
+          app_gradle = text_or_empty(ROOT / "frontend/android/app/build.gradle")
+          capacitor = text_or_empty(ROOT / "frontend/capacitor.config.ts")
+          if f'versionCode {EXPECTED_VERSION_CODE}' not in app_gradle or f'versionName "{EXPECTED_VERSION}"' not in app_gradle:
+              raise SystemExit("Unexpected Android version metadata.")
+          if EXPECTED_APPLICATION_ID not in app_gradle or EXPECTED_APPLICATION_ID not in capacitor:
+              raise SystemExit("Unexpected Android applicationId.")
+
+          download_and_verify_apk()
+          final_security_scan()
+          if security_findings:
+              write_metadata()
+              raise SystemExit("Possible secrets remain in staging package.")
+          write_metadata()
+          write_metadata()
+          verify_critical_files()
+          verify_no_forbidden_paths()
+          result = create_and_verify_zip()
+          write_package_result(result)
+          print(json.dumps(result, indent=2, sort_keys=True))
+          PY
+
+      - name: Show package result
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat package-result.json
+          sha256sum control-financiero-chatgpt-review.zip
+          unzip -l control-financiero-chatgpt-review.zip | sed -n '1,80p'
+
+      - name: Upload review artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-financiero-chatgpt-review
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            control-financiero-chatgpt-review.zip
+            control-financiero-chatgpt-review.zip.sha256.txt
+            package-result.json
