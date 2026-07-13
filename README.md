@@ -1,6 +1,6 @@
-# Control Financiero Ruben 1.3.4
+# Control Financiero Ruben 1.3.5
 
-Version de codigo: v1.3.4. GitHub Releases es el canal de distribucion vigente; la publicacion en Google Play esta pausada por decision del propietario.
+Version de codigo: v1.3.5. GitHub Releases es el canal de distribucion vigente; la publicacion en Google Play esta pausada por decision del propietario.
 
 Aplicacion financiera personal en COP construida con React, TypeScript, Firebase Auth, Cloud Firestore y Capacitor Android.
 

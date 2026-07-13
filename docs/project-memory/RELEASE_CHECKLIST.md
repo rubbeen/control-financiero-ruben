@@ -1,5 +1,17 @@
 # Lista de release
 
+## Estado v1.3.5
+
+- [x] Version 1.3.5 (135) sincronizada en package, frontend, Android, script y CI.
+- [x] Regresion de orientacion reproducida con host de 335 px y SVG obsoleto de 815 px.
+- [x] Epoch compartido remonta solo Recharts, sin recarga, navegacion ni consultas Firebase.
+- [x] Prueba dinamica pasa tres secuencias y cinco ciclos consecutivos.
+- [x] Completar lint, typecheck, 35 unitarias, 17 reglas, 20 E2E y 2 condicionales omitidas.
+- [x] Completar builds web GitHub/Play, lint y tests Android, APK GitHub y AAB Play firmados.
+- [x] Verificar paquete `com.ruben.controlfinanciero`, version 1.3.5 (135) y certificado permanente.
+- [ ] Prueba fisica no ejecutada porque no habia dispositivo ni emulador conectado.
+- [ ] Publicar GitHub Release v1.3.5 y actualizar el manifiesto solo tras verificar el asset.
+
 ## Estado v1.3.4
 
 - [x] Version 1.3.4 (134) sincronizada en package, frontend, Android, script y CI.

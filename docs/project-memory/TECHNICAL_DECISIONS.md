@@ -1,5 +1,12 @@
 # Decisiones tecnicas
 
+## TD-012: epoch de geometria limitado a graficas
+
+- Decision: observar una sola vez la geometria efectiva del viewport en la seccion de graficas y usar un epoch para remontar exclusivamente los tres `ResponsiveContainer`.
+- Motivo: Android WebView puede omitir una entrega de `ResizeObserver` tras la segunda rotacion, dejando SVG y tooltips con coordenadas anteriores.
+- Alternativas descartadas: recargar, cambiar de ruta, bloquear orientacion, remontar Dashboard o proveedores y ocultar globalmente el overflow.
+- Consecuencias: la correccion no consulta Firebase, conserva el estado y scroll vertical, deduplica eventos y limpia todos los listeners al desmontar.
+
 ## TD-010: registro propio con verificacion obligatoria
 
 - Decision: permitir `createUserWithEmailAndPassword`, enviar verificacion y cerrar inmediatamente la sesion temporal.

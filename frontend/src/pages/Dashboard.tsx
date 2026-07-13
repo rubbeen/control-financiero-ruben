@@ -13,9 +13,11 @@ import QuickActionButton from '../components/QuickActionButton';
 import RecommendationCard from '../components/RecommendationCard';
 import { useFinancialAnalysis } from '../hooks/useFinanceQueries';
 import { useAccount } from '../context/AccountContext';
+import useViewportLayoutEpoch from '../hooks/useViewportLayoutEpoch';
 import { handleFirestoreAccessError } from '../services/auth';
 import { isFirebaseAccessError } from '../services/firebaseErrorPolicy';
 import { resolveDashboardState } from '../services/dashboardState';
+import type { FinancialAnalysis } from '../services/analytics';
 import type { Recommendation } from '../types/finance';
 import { formatCurrency } from '../utils/currency';
 import { currentYearMonth, monthName } from '../utils/dates';
@@ -30,6 +32,17 @@ declare global {
 
 function ChartFallback() {
   return <div className="skeleton h-72 w-full" aria-label="Cargando grafica" />;
+}
+
+function DashboardCharts({ data }: { data: FinancialAnalysis }) {
+  const layoutEpoch = useViewportLayoutEpoch();
+  return (
+    <section data-testid="dashboard-chart-grid" className="grid w-full max-w-full min-w-0 gap-4 lg:grid-cols-3">
+      <div className="w-full max-w-full min-w-0"><h2 className="mb-2 text-lg font-bold">Ingresos vs gastos</h2><Suspense fallback={<ChartFallback />}><IncomeExpenseChart income={data.summary.total_income} expense={data.summary.total_expense} layoutEpoch={layoutEpoch} /></Suspense></div>
+      <div className="w-full max-w-full min-w-0"><h2 className="mb-2 text-lg font-bold">Gastos por categoria</h2><Suspense fallback={<ChartFallback />}><ExpenseCategoryChart data={data.summary.category_expenses} layoutEpoch={layoutEpoch} /></Suspense></div>
+      <div className="w-full max-w-full min-w-0"><h2 className="mb-2 text-lg font-bold">Evolucion mensual</h2><Suspense fallback={<ChartFallback />}><MonthlyTrendChart data={data.trends} layoutEpoch={layoutEpoch} /></Suspense></div>
+    </section>
+  );
 }
 
 export default function Dashboard() {
@@ -55,7 +68,7 @@ export default function Dashboard() {
     : data.recommendations[0];
 
   return (
-    <div className="w-full max-w-full min-w-0 space-y-5">
+    <div data-testid="dashboard-root" className="w-full max-w-full min-w-0 space-y-5">
       <InlineSyncStatus isFetching={financial.isFetching} hasRefreshError={financial.isError} onRetry={() => void financial.refetch()} />
       <section className="flex w-full max-w-full min-w-0 items-start justify-between gap-3">
         <div className="min-w-0"><h1 className="break-words text-2xl font-bold text-text">Hola</h1><p className="flex items-center gap-1 text-sm capitalize text-muted"><Calendar className="h-4 w-4" /> {monthName(year, month)}</p></div>
@@ -63,24 +76,20 @@ export default function Dashboard() {
       </section>
       <AccountSelector />
       <BalanceCard currentBalance={data.currentBalance} monthlyBalance={summary.balance} income={summary.total_income} expense={summary.total_expense} />
-      <section className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[340px]:grid-cols-2 md:grid-cols-5">
+      <section data-testid="dashboard-actions" className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[340px]:grid-cols-2 md:grid-cols-5">
         <QuickActionButton label="Agregar gasto" icon={PlusCircle} tone="orange" onClick={() => navigate('/add?tipo=expense')} />
         <QuickActionButton label="Agregar ingreso" icon={TrendingUp} tone="green" onClick={() => navigate('/add?tipo=income')} />
         <QuickActionButton label="Asesor financiero" icon={Bot} tone="dark" onClick={() => navigate('/advisor')} />
         <QuickActionButton label="Ver reporte" icon={FileText} tone="blue" onClick={() => navigate('/reports')} />
         <QuickActionButton label="Presupuesto" icon={Target} tone="dark" onClick={() => navigate('/budget')} />
       </section>
-      <section className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[340px]:grid-cols-2 lg:grid-cols-4">
+      <section data-testid="dashboard-metrics" className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[340px]:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Ingresos del mes" value={formatCurrency(summary.total_income)} icon={TrendingUp} tone="green" />
         <MetricCard title="Gastos del mes" value={formatCurrency(summary.total_expense)} icon={TrendingDown} tone="red" />
         <MetricCard title="Balance mensual" value={formatCurrency(summary.balance)} icon={Wallet} tone={summary.balance >= 0 ? 'green' : 'red'} />
         <MetricCard title="Presupuesto usado" value={`${budgetUsed.toFixed(0)}%`} icon={PieChart} tone={budgetUsed >= 80 ? 'orange' : 'blue'} />
       </section>
-      <section className="grid w-full max-w-full min-w-0 gap-4 lg:grid-cols-3">
-        <div className="w-full max-w-full min-w-0"><h2 className="mb-2 text-lg font-bold">Ingresos vs gastos</h2><Suspense fallback={<ChartFallback />}><IncomeExpenseChart income={summary.total_income} expense={summary.total_expense} /></Suspense></div>
-        <div className="w-full max-w-full min-w-0"><h2 className="mb-2 text-lg font-bold">Gastos por categoria</h2><Suspense fallback={<ChartFallback />}><ExpenseCategoryChart data={summary.category_expenses} /></Suspense></div>
-        <div className="w-full max-w-full min-w-0"><h2 className="mb-2 text-lg font-bold">Evolucion mensual</h2><Suspense fallback={<ChartFallback />}><MonthlyTrendChart data={data.trends} /></Suspense></div>
-      </section>
+      <DashboardCharts data={data} />
       <section className="grid w-full max-w-full min-w-0 gap-4 lg:grid-cols-2">
         <div className="w-full max-w-full min-w-0"><h2 className="mb-2 text-lg font-bold">Ultimos movimientos</h2><div className="w-full max-w-full min-w-0 space-y-2">{data.latestMovements.length ? data.latestMovements.map((item) => <MovementItem key={item.id} movement={item} onClick={() => navigate(`/movements/${item.id}`)} />) : <EmptyState onAction={() => navigate('/add')} actionLabel="Agregar movimiento" />}</div></div>
         <div className="w-full max-w-full min-w-0"><h2 className="mb-2 text-lg font-bold">Recomendacion principal</h2>{primaryRecommendation ? <RecommendationCard recommendation={primaryRecommendation} /> : <EmptyState title="Sin recomendacion" message="Registra movimientos para recibir recomendaciones." />}</div>

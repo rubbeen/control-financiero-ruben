@@ -3,19 +3,20 @@ import { formatCurrency } from '../utils/currency';
 
 interface Props {
   data: { category: string; amount: number; color?: string }[];
+  layoutEpoch?: number;
 }
 
-export default function ExpenseCategoryChart({ data }: Props) {
+export default function ExpenseCategoryChart({ data, layoutEpoch = 0 }: Props) {
   if (!data.length) return <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted">No hay gastos por categoria.</div>;
   const total = data.reduce((sum, item) => sum + item.amount, 0);
   const visibleItems = data.slice(0, 8);
 
   return (
-    <div className="rounded-lg border border-border bg-white p-3">
-      <div className="h-56">
-        <ResponsiveContainer width="100%" height="100%">
+    <div data-testid="expense-category-chart" className="w-full max-w-full min-w-0 rounded-lg border border-border bg-white p-3">
+      <div className="h-56 w-full max-w-full min-w-0 overflow-hidden">
+        <ResponsiveContainer key={layoutEpoch} width="100%" height="100%" minWidth={0} minHeight={0}>
           <PieChart>
-            <Pie data={data} dataKey="amount" nameKey="category" innerRadius={55} outerRadius={88} paddingAngle={3}>
+            <Pie data={data} dataKey="amount" nameKey="category" innerRadius={55} outerRadius={88} paddingAngle={3} isAnimationActive={false}>
               {data.map((item) => (
                 <Cell key={item.category} fill={item.color || '#2563EB'} />
               ))}
