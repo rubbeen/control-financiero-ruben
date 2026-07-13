@@ -1,12 +1,16 @@
-# Control Financiero Ruben 1.3.3
+# Control Financiero Ruben 1.3.4
 
-Version de codigo: v1.3.3. Los canales GitHub y Google Play se compilan por separado.
+Version de codigo: v1.3.4. GitHub Releases es el canal de distribucion vigente; la publicacion en Google Play esta pausada por decision del propietario.
 
 Aplicacion financiera personal en COP construida con React, TypeScript, Firebase Auth, Cloud Firestore y Capacitor Android.
 
 ## Arquitectura
 
-El cliente consulta Firestore directamente bajo `users/{uid}`. No existe backend Python ni servidor local: el computador puede permanecer apagado. Firebase Authentication exige una cuenta autorizada y verificada; las reglas versionadas agregan aislamiento por UID y validacion de documentos.
+El cliente consulta Firestore directamente bajo `users/{uid}`. No existe backend Python ni servidor local: el computador puede permanecer apagado. Firebase Authentication permite crear una cuenta desde la app y exige verificar el correo antes del primer acceso; las reglas versionadas agregan aislamiento por UID y validacion de documentos.
+
+## Acceso
+
+Una persona nueva puede elegir `Crear cuenta`, registrar su correo y una contrasena de al menos ocho caracteres. La app envia un enlace de verificacion, cierra la sesion temporal y solo permite entrar despues de confirmar el correo. Cada UID recibe cuentas, categorias, movimientos y presupuestos separados.
 
 ## Desarrollo
 

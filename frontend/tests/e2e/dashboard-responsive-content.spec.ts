@@ -141,6 +141,11 @@ test('mantiene completo el Dashboard en pantallas y fuentes exigentes', async ({
       return box.left >= -1 && box.right <= document.documentElement.clientWidth + 1 && box.width > 0 && box.height > 0;
     })).toBe(true);
 
+    const incomeExpenseChart = page.getByTestId('income-expense-chart');
+    const incomeExpenseText = await incomeExpenseChart.textContent();
+    expect(incomeExpenseText).not.toMatch(/\d+(?:[.,]\d+)?k\b/i);
+    expect(incomeExpenseText).toMatch(/\$\d+(?:,\d+)? M/);
+
     const firstMovement = page.getByTestId('movement-item').first();
     await firstMovement.focus();
     expect(await firstMovement.evaluate((element) => parseFloat(getComputedStyle(element).outlineWidth))).toBeGreaterThanOrEqual(3);

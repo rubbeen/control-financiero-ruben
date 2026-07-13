@@ -8,10 +8,13 @@ const root = process.cwd().endsWith('frontend') ? path.resolve(process.cwd(), '.
 const frontend = path.join(root, 'frontend');
 const packageJson = JSON.parse(await readFile(path.join(frontend, 'package.json'), 'utf8'));
 const gradle = await readFile(path.join(frontend, 'android', 'app', 'build.gradle'), 'utf8');
+const versionSource = await readFile(path.join(frontend, 'src', 'services', 'version.ts'), 'utf8');
 const versionName = gradle.match(/versionName\s+"([^"]+)"/)?.[1];
 const versionCode = Number(gradle.match(/versionCode\s+(\d+)/)?.[1]);
-if (packageJson.version !== versionName || versionName !== '1.3.2' || versionCode !== 132) throw new Error('Las versiones no coinciden. Ejecuta npm run version:check.');
-const apk = path.join(frontend, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
+const appVersionName = versionSource.match(/APP_VERSION\s*=\s*'([^']+)'/)?.[1];
+const appVersionCode = Number(versionSource.match(/APP_VERSION_CODE\s*=\s*(\d+)/)?.[1]);
+if (!/^\d+\.\d+\.\d+$/.test(versionName || '') || packageJson.version !== versionName || appVersionName !== versionName || appVersionCode !== versionCode) throw new Error('Las versiones no coinciden. Ejecuta npm run version:check.');
+const apk = path.join(frontend, 'android', 'app', 'build', 'outputs', 'apk', 'github', 'release', 'app-github-release.apk');
 const bytes = await readFile(apk).catch(() => { throw new Error('No existe APK release. Configura la firma externa y ejecuta assembleRelease.'); });
 const signingFile = path.join(frontend, 'android', 'keystore.properties');
 await stat(signingFile).catch(() => { throw new Error('Falta keystore.properties externo; se rechaza preparar una release sin firma configurada.'); });
@@ -20,15 +23,21 @@ if (!sdk) throw new Error('Define ANDROID_HOME para verificar la firma con apksi
 const buildTools = path.join(sdk, 'build-tools');
 const versions = (await import('node:fs/promises')).readdir(buildTools, { withFileTypes: true });
 const latest = (await versions).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0];
-const apksigner = path.join(buildTools, latest, process.platform === 'win32' ? 'apksigner.bat' : 'apksigner');
-const verification = execFileSync(apksigner, ['verify', '--verbose', '--print-certs', apk], { encoding: 'utf8', shell: process.platform === 'win32' });
+const apksignerJar = path.join(buildTools, latest, 'lib', 'apksigner.jar');
+const java = process.env.JAVA_HOME
+  ? path.join(process.env.JAVA_HOME, 'bin', process.platform === 'win32' ? 'java.exe' : 'java')
+  : 'java';
+const verification = execFileSync(java, ['-jar', apksignerJar, 'verify', '--verbose', '--print-certs', apk], { encoding: 'utf8' });
 if (!/Verified using v\d scheme[^:]*:\s*true/i.test(verification) || /Android Debug/i.test(verification)) throw new Error('La APK no tiene una firma release valida o usa certificado Android Debug.');
+const expectedCertificate = '8457C0879F10049FD9CC2E5BFA5B3B124A023E358BAF0EBFAF4256F53D9E0C4E';
+const actualCertificate = verification.match(/certificate SHA-256 digest:\s*([a-f0-9]{64})/i)?.[1].toUpperCase();
+if (actualCertificate !== expectedCertificate) throw new Error('La APK no usa la identidad release permanente.');
 const hash = createHash('sha256').update(bytes).digest('hex');
 const output = path.join(root, 'release-output');
 await mkdir(output, { recursive: true });
 const apkName = `control-financiero-ruben-v${versionName}.apk`;
 await copyFile(apk, path.join(output, apkName));
-const manifest = { versionName, versionCode, minimumSupportedVersionCode: 120, publishedAt: new Date().toISOString(), apkUrl: `https://github.com/rubbeen/control-financiero-ruben/releases/download/v${versionName}/${apkName}`, sha256: hash, fileSizeBytes: bytes.length, mandatory: false, releasePageUrl: `https://github.com/rubbeen/control-financiero-ruben/releases/tag/v${versionName}`, releaseNotes: ['Recupera automaticamente los datos del esquema anterior sin borrarlos.', 'Funciona mientras Firestore termina de construir los indices.', 'Mantiene cuentas, movimientos y saldos por UID.'] };
+const manifest = { versionName, versionCode, minimumSupportedVersionCode: 132, publishedAt: new Date().toISOString(), apkUrl: `https://github.com/rubbeen/control-financiero-ruben/releases/download/v${versionName}/${apkName}`, sha256: hash, fileSizeBytes: bytes.length, mandatory: false, releasePageUrl: `https://github.com/rubbeen/control-financiero-ruben/releases/tag/v${versionName}`, releaseNotes: ['Permite crear una cuenta y exige verificar el correo antes del primer acceso.', 'Adapta todas las pantallas a telefonos y tabletas Android en vertical y horizontal.', 'Mantiene nombres, descripciones, valores COP y graficas visibles en pantallas pequenas.'] };
 await writeFile(path.join(output, 'update-manifest.json'), JSON.stringify(manifest, null, 2));
 await writeFile(path.join(output, 'release-checklist.md'), `# Release ${versionName}\n\n- [ ] Verificar firma con apksigner.\n- [ ] Confirmar SHA-256: \`${hash}\`.\n- [ ] Probar instalacion y actualizacion manual.\n- [ ] Adjuntar APK a GitHub Release.\n- [ ] Publicar update-manifest.json solo despues del APK.\n- [ ] Conservar keystore fuera del repositorio.\n`);
 console.log(`Release local preparada en ${output}. No se publico ningun archivo.`);

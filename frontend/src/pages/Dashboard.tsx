@@ -63,14 +63,14 @@ export default function Dashboard() {
       </section>
       <AccountSelector />
       <BalanceCard currentBalance={data.currentBalance} monthlyBalance={summary.balance} income={summary.total_income} expense={summary.total_expense} />
-      <section className="grid w-full max-w-full min-w-0 grid-cols-2 gap-3 md:grid-cols-5">
+      <section className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[340px]:grid-cols-2 md:grid-cols-5">
         <QuickActionButton label="Agregar gasto" icon={PlusCircle} tone="orange" onClick={() => navigate('/add?tipo=expense')} />
         <QuickActionButton label="Agregar ingreso" icon={TrendingUp} tone="green" onClick={() => navigate('/add?tipo=income')} />
         <QuickActionButton label="Asesor financiero" icon={Bot} tone="dark" onClick={() => navigate('/advisor')} />
         <QuickActionButton label="Ver reporte" icon={FileText} tone="blue" onClick={() => navigate('/reports')} />
         <QuickActionButton label="Presupuesto" icon={Target} tone="dark" onClick={() => navigate('/budget')} />
       </section>
-      <section className="grid w-full max-w-full min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="grid w-full max-w-full min-w-0 grid-cols-1 gap-3 min-[340px]:grid-cols-2 lg:grid-cols-4">
         <MetricCard title="Ingresos del mes" value={formatCurrency(summary.total_income)} icon={TrendingUp} tone="green" />
         <MetricCard title="Gastos del mes" value={formatCurrency(summary.total_expense)} icon={TrendingDown} tone="red" />
         <MetricCard title="Balance mensual" value={formatCurrency(summary.balance)} icon={Wallet} tone={summary.balance >= 0 ? 'green' : 'red'} />

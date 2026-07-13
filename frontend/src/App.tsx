@@ -72,7 +72,7 @@ export default function App() {
   }, [attempt]);
 
   if (!authReady) return (
-    <main className="flex min-h-screen items-center justify-center bg-app px-5">
+    <main className="app-viewport safe-inline flex items-center justify-center bg-app">
       <section className="w-full max-w-md space-y-4" aria-busy="true">
         <div className="skeleton h-16 w-full" />
         <div className="skeleton h-72 w-full" />

@@ -46,18 +46,18 @@ export default function Layout() {
   }, [location.pathname, goBack]);
 
   return (
-    <div className="min-h-screen bg-app">
+    <div className="app-viewport bg-app">
       <header className="safe-header sticky top-0 z-30 border-b border-orange-100 bg-cream/95 pb-3 shadow-sm backdrop-blur">
-        <div className="mx-auto flex max-w-6xl min-w-0 items-center gap-2 px-4">
+        <div className="safe-inline mx-auto flex max-w-6xl min-w-0 items-center gap-2">
           {showBack && <button type="button" onClick={goBack} aria-label="Volver" className="touch-target flex-none rounded-lg text-cocoa"><ArrowLeft className="h-5 w-5" /></button>}
           <AppLogo />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[15px] font-extrabold leading-tight text-cocoa">Control Financiero Ruben</p>
+            <p className="break-words text-[15px] font-extrabold leading-tight text-cocoa">Control Financiero Ruben</p>
             <p className="mt-1 break-words text-xs font-medium text-muted">Datos protegidos - COP</p>
           </div>
         </div>
       </header>
-      <main className="safe-bottom mx-auto w-full max-w-6xl min-w-0 px-4 py-4"><Outlet /></main>
+      <main className="safe-bottom safe-inline mx-auto w-full max-w-6xl min-w-0 py-4"><Outlet /></main>
       {exitHint && <p role="status" className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-cocoa px-4 py-3 text-sm font-semibold text-white shadow-lg">Presiona de nuevo para salir</p>}
       <BottomNavigation />
     </div>

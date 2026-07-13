@@ -1,5 +1,13 @@
 import { FirebaseError } from 'firebase/app';
-import { onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  User
+} from 'firebase/auth';
 import { auth } from './firebase';
 import { clearInitializationState } from './firestoreHelpers';
 import { queryClient } from './queryClient';
@@ -7,10 +15,14 @@ import { queryClient } from './queryClient';
 let pendingAuthNotice = '';
 
 const friendlyErrors: Record<string, string> = {
+  'auth/email-already-in-use': 'Ya existe una cuenta con este correo.',
+  'auth/invalid-email': 'Ingresa un correo valido.',
   'auth/invalid-credential': 'El correo o la contrasena no coinciden.',
+  'auth/operation-not-allowed': 'La creacion de cuentas no esta disponible temporalmente.',
   'auth/too-many-requests': 'Hubo demasiados intentos. Espera unos minutos.',
   'auth/network-request-failed': 'No pudimos comunicarnos con el servicio. Revisa tu internet.',
-  'auth/user-disabled': 'Esta cuenta fue deshabilitada.'
+  'auth/user-disabled': 'Esta cuenta fue deshabilitada.',
+  'auth/weak-password': 'La contrasena debe tener al menos 8 caracteres.'
 };
 
 export function authErrorMessage(error: unknown) {
@@ -36,6 +48,30 @@ export async function loginWithEmail(email: string, password: string) {
       throw new Error('Debes verificar tu correo. Enviamos un enlace nuevo.');
     }
   } catch (error) {
+    throw Object.assign(new Error(authErrorMessage(error)), { cause: error });
+  }
+}
+
+export async function registerWithEmail(email: string, password: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) throw new Error('Ingresa un correo valido.');
+  if (password.length < 8) throw new Error('La contrasena debe tener al menos 8 caracteres.');
+  if (password.length > 128) throw new Error('La contrasena no puede superar 128 caracteres.');
+
+  try {
+    const credential = await createUserWithEmailAndPassword(auth, normalized, password);
+    try {
+      await sendEmailVerification(credential.user);
+    } finally {
+      await signOut(auth);
+    }
+    return normalized;
+  } catch (error) {
+    try {
+      if (auth.currentUser && !auth.currentUser.emailVerified) await signOut(auth);
+    } catch {
+      // El cierre de una sesion incompleta no debe ocultar el error de registro.
+    }
     throw Object.assign(new Error(authErrorMessage(error)), { cause: error });
   }
 }

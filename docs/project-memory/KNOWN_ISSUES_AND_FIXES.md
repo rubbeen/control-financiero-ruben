@@ -1,5 +1,27 @@
 # Problemas conocidos y soluciones
 
+## AUTH-001
+
+- Identificador: AUTH-001.
+- Fecha: 2026-07-13.
+- Sintoma: una persona nueva no podia crear su propia cuenta desde la pantalla inicial.
+- Causa raiz confirmada: el servicio y la interfaz solo exponian inicio de sesion y recuperacion de contrasena.
+- Solucion que funciono: registro con correo normalizado, contrasena minima de ocho caracteres, confirmacion, correo de verificacion obligatorio y cierre de la sesion no verificada.
+- Pruebas que validan la solucion: cuatro unitarias de autenticacion y E2E contra Authentication Emulator que cubre registro, bloqueo, verificacion y primer ingreso.
+- Como detectar una regresion: ausencia de `Crear cuenta`, acceso antes de verificar o datos creados fuera de `users/{uid}`.
+- Que no volver a hacer: no considerar completo un acceso multiusuario si solo existe el formulario de ingreso.
+
+## UI-002
+
+- Identificador: UI-002.
+- Fecha: 2026-07-13.
+- Sintoma: el ancho minimo fijo, la cabecera y cuadrillas de dos columnas se comprimian en Android pequeno u horizontal.
+- Causa raiz confirmada: `min-width: 320px`, espacios seguros incompletos y layouts sin un punto de quiebre para contenido largo.
+- Solucion que funciono: viewport dinamico, safe areas en los cuatro bordes, navegacion compacta en horizontal y cuadrillas de una columna debajo de 340 px.
+- Pruebas que validan la solucion: 13 casos responsive sobre todas las rutas, de 320 x 568 a 1366 x 768, incluyendo 740 x 360 y 915 x 412.
+- Como detectar una regresion: `scrollWidth > innerWidth`, objetivos tactiles menores de 44 px o nombres y valores COP truncados.
+- Que no volver a hacer: no imponer un ancho minimo al documento ni usar truncado para ocultar informacion financiera.
+
 ## SYNC-001
 
 - Sintoma: el Dashboard mostraba un error rojo mientras la consulta financiera seguia deshabilitada porque aun no existia cuenta activa.
