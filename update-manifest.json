@@ -1,16 +1,17 @@
 {
-  "versionName": "1.3.1",
-  "versionCode": 131,
-  "minimumSupportedVersionCode": 120,
-  "publishedAt": "2026-07-10T12:18:17Z",
-  "apkUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/download/v1.3.1/control-financiero-ruben-v1.3.1.apk",
-  "sha256": "fdb596ec95f7e709e5b70ea3ef45d9e5a1ec1bac4f48936b97ae2debd6986801",
-  "fileSizeBytes": 4998710,
+  "versionName": "1.3.3",
+  "versionCode": 133,
+  "minimumSupportedVersionCode": 132,
+  "publishedAt": "2026-07-13T18:12:54Z",
+  "apkUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/download/v1.3.3/control-financiero-ruben-v1.3.3.apk",
+  "sha256": "67b66a71802e683537aae30971ef4c9bc83f329be7fb5f8534fe8e23edf2094c",
+  "fileSizeBytes": 1997699,
   "mandatory": false,
-  "releasePageUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/tag/v1.3.1",
+  "releasePageUrl": "https://github.com/rubbeen/control-financiero-ruben/releases/tag/v1.3.3",
   "releaseNotes": [
-    "Recupera automaticamente los datos del esquema anterior sin borrarlos.",
-    "Funciona mientras Firestore termina de construir los indices.",
-    "Mantiene cuentas, movimientos y saldos por UID."
+    "Corrige el falso error de conexion durante la carga inicial y mantiene los datos visibles al refrescar.",
+    "Permite guardar, compartir y abrir PDF, CSV y respaldos de forma fiable en Android.",
+    "Agrega proteccion de capturas configurable y prepara una variante privada para Google Play.",
+    "Las versiones 1.3.1 o anteriores requieren instalar esta actualizacion manualmente desde GitHub."
   ]
 }
