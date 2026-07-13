@@ -4,6 +4,8 @@ import { movementSignedAmount } from '../utils/calculations';
 import { db } from './firebase';
 import { getAuthenticatedUid, userCollection, userDocument } from './firestoreHelpers';
 import { decryptBackup, encryptBackup, EncryptedEnvelope } from './backupCrypto';
+import { movementsService } from './movements';
+import type { PreparedFile } from './fileExport';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_ROWS = 5000;
@@ -16,15 +18,6 @@ export interface BackupData {
   categories: Category[];
   movements: Movement[];
   budgets: Budget[];
-}
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function validate(data: unknown): BackupData {
@@ -64,11 +57,12 @@ export function csvCell(value: unknown) {
 }
 
 export const backupService = {
-  async exportEncrypted(password: string, filenamePrefix = 'control-financiero') {
+  async generateEncryptedBackup(password: string, filenamePrefix = 'control-financiero'): Promise<PreparedFile & { metadata: { formatVersion: number; generatedAt: string } }> {
     const uid = getAuthenticatedUid();
     const envelope = await encryptBackup(await readData(uid), password);
     const date = new Date().toISOString().slice(0, 10);
-    downloadBlob(new Blob([JSON.stringify(envelope)], { type: 'application/octet-stream' }), `${filenamePrefix}-${date}.cfrbackup`);
+    const generatedAt = new Date().toISOString();
+    return { bytes: new TextEncoder().encode(JSON.stringify(envelope)), filename: `${filenamePrefix}-${date}.cfrbackup`, mimeType: 'application/octet-stream', metadata: { formatVersion: 4, generatedAt } };
   },
 
   async preview(file: File, password: string) {
@@ -88,7 +82,6 @@ export const backupService = {
 
   async importEncrypted(file: File, password: string, onProgress: (value: number) => void, signal?: AbortSignal) {
     const preview = await this.preview(file, password);
-    await this.exportEncrypted(password, 'respaldo-antes-de-importar');
     const uid = getAuthenticatedUid();
     const existing = await readData(uid);
     const accountIds = new Set(existing.accounts.map((item) => item.id));
@@ -126,12 +119,15 @@ export const backupService = {
     return { imported: writes.length, skipped: preview.conflicts };
   },
 
-  async exportCsv(accountId: number) {
+  async generateAccountCsv(accountId: number): Promise<PreparedFile & { rowCount: number }> {
     const uid = getAuthenticatedUid();
-    const [movements, categories] = await Promise.all([getDocs(userCollection('movements', uid)), getDocs(userCollection('categories', uid))]);
+    const [movements, categories] = await Promise.all([
+      movementsService.getAllByRange({ uid, accountId, startDate: '0001-01-01', endDate: '9999-12-31' }),
+      getDocs(userCollection('categories', uid))
+    ]);
     const categoryMap = new Map(categories.docs.map((item) => [Number(item.data().id), String(item.data().name)]));
     const headers = ['id', 'tipo', 'valor_cop', 'fecha', 'categoria', 'descripcion', 'metodo_pago', 'necesario'];
-    const rows = movements.docs.map((item) => item.data() as Movement).filter((item) => item.account_id === accountId).map((item) => [item.id, item.type, item.amount, item.date, categoryMap.get(item.category_id) || '', item.description, item.payment_method || '', item.is_necessary ? 'si' : 'no'].map(csvCell).join(','));
-    downloadBlob(new Blob([`\ufeff${headers.join(',')}\r\n${rows.join('\r\n')}`], { type: 'text/csv;charset=utf-8' }), `movimientos-cuenta-${accountId}.csv`);
+    const rows = movements.map((item) => [item.id, item.type, item.amount, item.date, categoryMap.get(item.category_id) || '', item.description, item.payment_method || '', item.is_necessary ? 'si' : 'no'].map(csvCell).join(','));
+    return { bytes: new TextEncoder().encode(`\ufeff${headers.join(',')}\r\n${rows.join('\r\n')}`), filename: `movimientos-cuenta-${accountId}.csv`, mimeType: 'text/csv', rowCount: rows.length };
   }
 };

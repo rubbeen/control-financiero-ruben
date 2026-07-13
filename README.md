@@ -1,6 +1,6 @@
-# Control Financiero Ruben 1.3.2
+# Control Financiero Ruben 1.3.3
 
-Version de codigo: v1.3.2. La version publica permanece sin cambios hasta disponer de una firma release valida.
+Version de codigo: v1.3.3. Los canales GitHub y Google Play se compilan por separado.
 
 Aplicacion financiera personal en COP construida con React, TypeScript, Firebase Auth, Cloud Firestore y Capacitor Android.
 
@@ -43,7 +43,7 @@ cd android
 gradlew.bat lint test assembleDebug
 ```
 
-Android bloquea cleartext y backup, y activa `FLAG_SECURE` en release. El `applicationId` sigue siendo `com.ruben.controlfinanciero`.
+Android bloquea cleartext y backup. `FLAG_SECURE` es una preferencia local reversible, desactivada por defecto. El `applicationId` sigue siendo `com.ruben.controlfinanciero`.
 
 ## Firma y release
 

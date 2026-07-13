@@ -11,6 +11,8 @@ interface AccountContextValue {
   activeAccountId: number;
   isLoading: boolean;
   isFetching: boolean;
+  isError: boolean;
+  error: unknown;
   setActiveAccountId: (id: number) => Promise<void>;
 }
 
@@ -48,6 +50,8 @@ export function AccountProvider({ uid, children }: { uid: string; children: Reac
     activeAccountId: activeAccount?.id || requestedId,
     isLoading: accountsQuery.isLoading,
     isFetching: accountsQuery.isFetching,
+    isError: accountsQuery.isError,
+    error: accountsQuery.error,
     setActiveAccountId: changeAccount
   };
 

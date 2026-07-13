@@ -22,3 +22,8 @@
 | Android release | Firma, package ID, version y huella | Local | APK firmada | Pasa | 2026-07-11 | `gradlew.bat assembleRelease` y `apksigner verify` |
 | Android release | Firma, package ID, version y huella | CI manual | APK firmada | Pendiente merge | 2026-07-11 | `android-release.yml` |
 | Dispositivo | Samsung Galaxy A33 fisico | 1080 x 2400 | Datos sinteticos | Pendiente | 2026-07-10 | Prueba manual |
+| Carga | Query deshabilitada y refetch con cache | jsdom/E2E | Datos sinteticos | Pasa unitarias; E2E final pendiente | 2026-07-13 | `npm run test` / `npm run test:e2e` |
+| Archivos | PDF inicia `%PDF`, nombre seguro y bytes base64 | jsdom | Datos sinteticos COP | Pasa | 2026-07-13 | `npm run test` |
+| Android GitHub | Lint, tests, APK release | API 35 | Build local | Pasa | 2026-07-13 | `assembleGithubRelease` |
+| Android Play | Lint, tests, APK y AAB release | API 35 | Build local | Pasa | 2026-07-13 | `bundlePlayRelease` |
+| Play | 16 KB y librerias nativas | bundletool 1.18.3 | AAB 1.3.3 | `PAGE_ALIGNMENT_16K`; 0 `.so` | 2026-07-13 | `bundletool dump config` |

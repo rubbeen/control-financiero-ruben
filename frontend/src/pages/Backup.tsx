@@ -1,9 +1,10 @@
-import { Download, LockKeyhole, Upload } from 'lucide-react';
+import { Download, LockKeyhole, Share2, Upload } from 'lucide-react';
 import { ChangeEvent, useRef, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useAccount } from '../context/AccountContext';
 import { useUid } from '../hooks/useFinanceQueries';
 import { backupService } from '../services/backup';
+import { fileExport } from '../services/fileExport';
 import { queryClient } from '../services/queryClient';
 
 export default function Backup() {
@@ -17,6 +18,7 @@ export default function Backup() {
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [stage, setStage] = useState('');
   const importController = useRef<AbortController | null>(null);
 
   const chooseFile = (event: ChangeEvent<HTMLInputElement>) => {
@@ -42,6 +44,11 @@ export default function Backup() {
     setPreview(null);
     importController.current = new AbortController();
     try {
+      setStage('Preparando respaldo preventivo...');
+      const preventive = await backupService.generateEncryptedBackup(password, 'respaldo-antes-de-importar');
+      const saved = await fileExport.save(preventive);
+      if (saved.status !== 'saved') throw new DOMException('Debes guardar el respaldo preventivo antes de importar.', 'AbortError');
+      setStage('Importando datos validados...');
       const result = await backupService.importEncrypted(file, password, setProgress, importController.current.signal);
       await Promise.all(['accounts', 'categories', 'movements', 'financialAnalysis', 'budget'].map((key) => queryClient.invalidateQueries({ queryKey: [key, uid] })));
       setMessage(`Importacion terminada: ${result.imported} registros; ${result.skipped} conflictos omitidos.`);
@@ -54,18 +61,48 @@ export default function Backup() {
     }
   };
 
+  const exportBackup = async (share = false) => {
+    if (busy) return;
+    setBusy(true); setError(''); setMessage(''); setProgress(0); setStage('Cifrando respaldo...');
+    try {
+      const generated = await backupService.generateEncryptedBackup(password);
+      setProgress(80); setStage(share ? 'Preparando para compartir...' : 'Seleccionando ubicacion...');
+      const result = share ? await fileExport.share(generated) : await fileExport.save(generated);
+      if (result.status === 'cancelled') setMessage('No se guardo el respaldo.');
+      else { setProgress(100); setMessage(share ? 'Respaldo listo para compartir.' : 'Respaldo guardado correctamente.'); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo exportar el respaldo.'); }
+    finally { setBusy(false); }
+  };
+
+  const exportCsv = async (share = false) => {
+    if (busy) return;
+    setBusy(true); setError(''); setMessage(''); setProgress(0); setStage('Preparando movimientos de la cuenta...');
+    try {
+      const generated = await backupService.generateAccountCsv(activeAccountId);
+      setProgress(80); setStage(share ? 'Preparando para compartir...' : 'Seleccionando ubicacion...');
+      const result = share ? await fileExport.share(generated) : await fileExport.save(generated);
+      if (result.status === 'cancelled') setMessage('No se guardo el CSV.');
+      else { setProgress(100); setMessage(`${generated.rowCount} movimientos exportados correctamente.`); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo exportar el CSV.'); }
+    finally { setBusy(false); }
+  };
+
   return (
     <div className="space-y-4">
-      <ConfirmDialog open={preview !== null} title="Confirmar importacion" message={<span>Se importaran hasta {preview?.counts.movements} movimientos. Se omitiran {preview?.conflicts} conflictos y primero se descargara un respaldo cifrado del estado actual.</span>} confirmLabel="Importar" onCancel={() => setPreview(null)} onConfirm={() => void importFile()} />
+      <ConfirmDialog open={preview !== null} title="Confirmar importacion" message={<span>Se importaran hasta {preview?.counts.movements} movimientos. Se omitiran {preview?.conflicts} conflictos. Antes deberas guardar un respaldo cifrado del estado actual.</span>} confirmLabel="Guardar respaldo e importar" onCancel={() => setPreview(null)} onConfirm={() => void importFile()} />
       <h1 className="text-2xl font-bold">Copia de seguridad cifrada</h1>
       <p className="rounded-lg bg-blue-50 p-3 text-sm text-primary">La contrasena no se guarda. Sin ella no es posible recuperar el archivo.</p>
       <label className="block text-sm font-semibold">Contrasena del respaldo<input type="password" minLength={10} className="mt-1 w-full rounded-lg border px-3 py-3" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-      <button disabled={busy || password.length < 10} onClick={() => void backupService.exportEncrypted(password)} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-white disabled:opacity-50"><LockKeyhole className="h-5 w-5" /> Exportar .cfrbackup</button>
-      <button onClick={() => void backupService.exportCsv(activeAccountId)} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-navy font-semibold text-white"><Download className="h-5 w-5" /> Exportar CSV de esta cuenta</button>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button disabled={busy || password.length < 10} onClick={() => void exportBackup()} className="action-primary"><LockKeyhole className="h-5 w-5" /> Guardar .cfrbackup</button>
+        <button disabled={busy || password.length < 10} onClick={() => void exportBackup(true)} className="action-secondary"><Share2 className="h-5 w-5" /> Compartir respaldo</button>
+        <button disabled={busy} onClick={() => void exportCsv()} className="action-primary"><Download className="h-5 w-5" /> Guardar CSV de esta cuenta</button>
+        <button disabled={busy} onClick={() => void exportCsv(true)} className="action-secondary"><Share2 className="h-5 w-5" /> Compartir CSV</button>
+      </div>
       <p className="text-xs text-muted">El CSV incluye BOM UTF-8 y neutraliza formulas, pero no esta cifrado. Eliminalo cuando ya no lo necesites.</p>
       <label className="flex cursor-pointer flex-col items-center rounded-lg border border-dashed bg-white p-8 text-center"><Upload className="h-8 w-8 text-primary" /><span className="mt-2 font-semibold">Seleccionar .cfrbackup</span><input type="file" accept=".cfrbackup,application/octet-stream" onChange={chooseFile} className="hidden" /></label>
       {file && <button disabled={busy || password.length < 10} onClick={() => void inspect()} className="w-full rounded-lg border border-primary px-4 py-3 font-semibold text-primary">Validar y ver resumen</button>}
-      {busy && <div><p className="text-sm">Procesando... {progress ? `${progress}%` : ''}</p><progress className="w-full" value={progress} max="100" />{importing && <button type="button" onClick={() => importController.current?.abort()} className="mt-2 min-h-11 text-expense">Cancelar importacion</button>}</div>}
+      {busy && <div aria-live="polite" aria-busy="true"><p className="text-sm">{stage || 'Procesando...'} {progress ? `${progress}%` : ''}</p><progress className="w-full" value={progress} max="100" />{importing && <button type="button" onClick={() => importController.current?.abort()} className="mt-2 min-h-12 text-expense">Cancelar importacion</button>}</div>}
       {message && <p className="rounded-lg bg-green-50 p-3 text-income">{message}</p>}
       {error && <p className="rounded-lg bg-red-50 p-3 text-expense">{error}</p>}
     </div>
